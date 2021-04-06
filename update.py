@@ -11,6 +11,7 @@ from qpkg import Kiwoom
 import datetime
 import requests
 import sys
+from collections import defaultdict
 from os.path import isfile
 from os import remove
 from bs4 import BeautifulSoup
@@ -29,6 +30,7 @@ def main():
                  norm_pwd=configUpdate.DB['NORM_PWD'],
                  db_name=configUpdate.DB['DB_NAME'])
     db.open()
+    # Init Update
     is_init = check_init(db=db)
     if is_init:
         logger.info('Init update start...')
@@ -36,21 +38,23 @@ def main():
     else:
         logger.info("Init update already done...")
 
-    update_date = get_update_date()
-    if check_sinfo_update(db=db, update_date=update_date[0]):
+    # Stock Info table Update
+    sinfo_date, chart_date = get_update_date()
+    if check_sinfo_update(db=db, update_date=sinfo_date):
         logger.info('Stock info update start...')
-        update_sinfo_and_schema(db=db, update_date=update_date[0])
+        update_sinfo_and_schema(db=db, update_date=sinfo_date)
         if check_manual_transfer():
             logger.info('To transfer chart data manually, update end...')
             return
     else:
         logger.info('Stock info update is not necessary > skipped')
 
-    update_dict = get_chart_update_dict(db=db, update_date=update_date[1])
+    # Chart table Update
+    update_dict = get_chart_update_dict(db=db, update_date=chart_date)
     db.close()
     if update_dict:
         logger.info('Chart update start...')
-        update_chart_tables(update_dict=update_dict, update_date=update_date[1])
+        update_chart_tables(db=db, update_dict=update_dict, update_date=chart_date)
     else:
         logger.info('Chart table update is not necessary > skipped')
     logger.info('All update is done...')
@@ -84,6 +88,8 @@ def get_update_date():
     sinfo_update_date = chart_update_date - datetime.timedelta(days=1)
     sinfo_update_date = qutils.get_latest_trading_date(sinfo_update_date,
                                                        configUpdate.CLOSED_DAYS_EXCEL_PATH)
+    # sinfo update date is based on WICS index and its website process update at almost 3AM.
+    # So previous day will be chosen to be sinfo update date.
     return (sinfo_update_date, chart_update_date)
 
 
@@ -208,7 +214,7 @@ def check_manual_transfer():
     elif configUpdate.MANUAL_CHART_TRANSFER is False:
         return False
     else:
-        raise ReferenceError
+        raise ReferenceError("MANUAL_CHART_TRANSFER in config file must be True or False.")
 
 
 def get_chart_update_dict(db, update_date):
@@ -227,9 +233,202 @@ def get_chart_update_dict(db, update_date):
             latest = start_date
         if latest < update_date:
             update_dict[code] = {'listing':listing_date, 'last':last_update, 'latest':latest}
+            # listing : company listing date
+            # last : last update date
+            # latest : update start date
     return update_dict
 
 
+def update_chart_tables(db, update_dict, update_date):
+    log = qutils.Log()
+    log_queue = Queue()
+    logger = log.config_queue_log(log_queue, name='queue')
+    log.listener_start(configUpdate.LOG_PATH, name='file', queue=log_queue)
+
+    lock = Lock()
+    buffer = Queue()
+
+    rc = Process(target=receive_chart_data,
+                 args=(buffer, db, len(update_dict), update_date))
+    rc.start()
+
+    tr_ohlc = Process()
+    tr_investor = Process()
+    while True:
+        if (not tr_ohlc.is_alive()) and (tr_ohlc.exitcode != 0):
+            logger.debug(f'tr_ohlc terminated with code {tr_ohlc.exitcode}')
+            tr_ohlc = Process(target=transmit_ohlc_data,
+                              args=(buffer, update_dict, update_date, lock, log_queue, db))
+            tr_ohlc.start()
+        if (not tr_investor.is_alive()) and (tr_investor.exitcode != 0):
+            logger.debug(f'tr_investor terminated with code {tr_investor.exitcode}')
+            tr_investor = Process(target=transmit_investor_data,
+                                  args=(buffer, update_dict, update_date, lock, log_queue))
+            tr_investor.start()
+        if (tr_ohlc.exitcode == 0) and (tr_investor.exitcode == 0):
+            break
+        time.sleep(0.1)
+
+    log.listener_end(log_queue)
+    buffer.put(None); rc.join()
+
+    opts = ['10081', '10060']
+    for opt in opts:
+        file_path = configUpdate.PROCESS_PICKLE_PATH + f'_{opt}.pickle'
+        if isfile(file_path):
+            remove(file_path)
+
+
+def receive_chart_data(buffer, db, update_len, update_date):
+    with tqdm(total=update_len*2, ascii=True, desc='Chart Table UPDATE') as pbar:
+        proc_list = defaultdict(int)
+        while True:
+            data = buffer.get()
+            if data:
+                code, opt, df, isEnd = data
+                if opt == 10081: # ohlc data
+                    for row in df.itertuples():
+                        db.insert_ohlc_into_chart(code, getattr(row, 'Index'), getattr(row, 'open'),
+                                                  getattr(row, 'close'), getattr(row, 'high'),
+                                                  getattr(row, 'low'), getattr(row, 'volume_q'))
+                elif opt == 10060: # investor data
+                    for row in df.itertuples():
+                        db.insert_investor_into_chart(code, getattr(row, 'Index'), getattr(row, 'fore'),
+                                                      getattr(row, 'inst'), getattr(row, 'indi'))
+                if isEnd:
+                    pbar.update(1)
+                    proc_list[code] += 1
+                    if proc_list[code] == 2:
+                        db.update_chart_date_in_meta(code, update_date)
+
+            elif data is None:
+                break
+
+
+def transmit_ohlc_data(buffer, update_dict, update_date, lock, log_queue, db):
+    log = qutils.Log()
+    logger = log.config_queue_log(log_queue, 'queue')
+
+    app = Kiwoom.QApplication(sys.argv)
+    kiwoom = Kiwoom.Kiwoom()
+    multiproc_kiwoom_login(kiwoom, lock, logger)
+
+    file_path = configUpdate.PROCESS_PICKLE_PATH + '_10081.pickle'
+    update_list = load_update_list(file_path, logger, update_dict, update_date)
+
+    opt = 10081
+    i, state, data = 0, 0, None
+    for i, (code, start, end) in enumerate(update_list):
+        try:
+            state, data = kiwoom.req_opt10081(com_code=code, end_date=end,
+                                              modi_price=True, start_date=start)
+        except Exception as e:
+            logger.error(f"code'{code}' 10081 Error'{e}'")
+            continue
+        if state == -1:  # LIMIT TR COUNT
+            isEnd = False
+            buffer.put([code, opt, data, isEnd])
+            break
+        else:
+            # check par value change or stock increase or decrease
+            if update_dict[code]['last']:
+                before_price = db.get_recent_stock_price(code, data.index[-1])
+                after_price = data.iloc[-1]['close']
+                if before_price != after_price:  # if price is not equal at the same day
+                    end = update_dict[code]['last']
+                    start = datetime.datetime.strptime(configUpdate.START_DATE, "%Y-%m-%d").date()
+                    try:
+                        state, data = kiwoom.req_opt10081(com_code=code, end_date=end,
+                                                          modi_price=True, start_date=start)
+                    except Exception as e:
+                        logger.error(f"code'{code}' 10081 Error'{e}'")
+                        continue
+                    if state == -1:  # LIMIT TR COUNT
+                        update_list[i:][0][1] = start
+                        isEnd = False
+                        buffer.put([code, opt, data, isEnd])
+                        break
+            isEnd = True
+            buffer.put([code, opt, data, isEnd])
+
+    exit_code = 0
+    if state == -1:
+        exit_code = 1
+        if data:  end_date = data.index[-1]
+        else:     end_date = update_date
+        update_list[i:][0][2] = end_date
+        with open(file_path, 'wb') as f:
+            pickle.dump(update_list[i:], f)
+            logger.debug('Pickle saving...')
+    exit(exit_code)
+
+
+def transmit_investor_data(buffer, update_dict, update_date, lock, log_queue):
+    log = qutils.Log()
+    logger = log.config_queue_log(log_queue, 'queue')
+
+    app = Kiwoom.QApplication(sys.argv)
+    kiwoom = Kiwoom.Kiwoom()
+    multiproc_kiwoom_login(kiwoom, lock, logger)
+
+    file_path = configUpdate.PROCESS_PICKLE_PATH + '_10060.pickle'
+    update_list = load_update_list(file_path, logger, update_dict, update_date)
+
+    opt = 10060
+    i, state, data = 0, 0, None
+    for i, (code, start, end) in enumerate(update_list):
+        try:
+            state, data = kiwoom.req_opt10060(com_code=code, end_date=end, form_opt='MONEY',
+                                              trade_opt='TOTAL', start_date=start)
+        except Exception as e:
+            logger.error(f"code'{code}' 10060 Error'{e}'")
+            continue
+        if state == -1:  # LIMIT TR COUNT
+            isEnd = False
+            buffer.put([code, opt, data, isEnd])
+            break
+        else:
+            isEnd = True
+            buffer.put([code, opt, data, isEnd])
+
+    exit_code = 0
+    if state == -1:
+        exit_code = 1
+        if data:  end_date = data.index[-1]
+        else:     end_date = update_date
+        update_list[i:][0][2] = end_date
+        with open(file_path, 'wb') as f:
+            pickle.dump(update_list[i:], f)
+            logger.debug('Pickle saving...')
+    exit(exit_code)
+
+
+def multiproc_kiwoom_login(kiwoom, lock, logger):
+    lock.acquire()  # process lock
+    kiwoom.manual_login(user_id=configUpdate.KIWOOM[1]['USER_ID'],
+                        norm_pwd=configUpdate.KIWOOM[1]['NORM_PWD'],
+                        cert_pwd=configUpdate.KIWOOM[1]['CERT_PWD'],
+                        is_mock=False)
+    if kiwoom.get_connect_state():
+        logger.debug('Kiwoom login success.')
+        lock.release()  # process unlock
+    else:
+        logger.debug('Kiwoom login fails, process terminated')
+        lock.release()  # process unlock
+        exit(1)
+
+
+def load_update_list(file_path, logger, update_dict, update_date):
+    if isfile(file_path):
+        with open(file_path, 'rb') as f:
+            update_list = pickle.load(f)
+            logger.debug('Pickle load...')
+    else:
+        update_list = [[code, update_dict[code]['latest'], update_date] for code in update_dict]
+        logger.debug('Pickle file does not exist. Data gathering starts from the beginning')
+    return update_list
+
+"""
 def update_chart_tables(update_dict, update_date):
     n_procs = configUpdate.NUMBER_OF_PROCESS
     sum_date = datetime.timedelta(days=0)
@@ -287,6 +486,7 @@ def update_chart_tables(update_dict, update_date):
         file_path = configUpdate.PROCESS_PICKLE_PATH + f'_{p_no}.pickle'
         if isfile(file_path):
             remove(file_path)
+
 
 def multi_chart_update(update_dict, update_date, p_no, lock, code_queue, log_queue):
     start_time = time.time()
@@ -429,7 +629,7 @@ def multi_chart_update(update_dict, update_date, p_no, lock, code_queue, log_que
     db.close()
     logger.debug('PID_{0} terminated. time:{1:.2f}'.format(p_no, time.time()-start_time))
     exit(exit_code)
-
+"""
 
 if __name__=='__main__':
     main()

@@ -6,8 +6,6 @@ this module handle MariaDB stock database
 """
 
 import MySQLdb as mysql
-import datetime
-#from ..config import config
 
 class StockDB():
     def __init__(self, user_id, norm_pwd, db_name):
@@ -75,6 +73,7 @@ class StockDB():
         sql = 'SELECT code FROM stock_info;'
         self.cur.execute(sql)
         data = self.cur.fetchall()
+        data = (c for code in data for c in code)
         return data
 
     def get_all_from_sinfo(self):
@@ -134,17 +133,17 @@ class StockDB():
     def insert_ohlc_into_chart(self, code, date, p_open, p_close, p_high, p_low, volume_q):
         date = date.strftime('%Y-%m-%d')
         values = (date, p_open, p_close, p_high, p_low, volume_q)
-        sql = "INSERT INTO c_{0}(date, open, close, high, low, volume) VALUES {1} "\
-              "ON DUPLICATE KEY "\
-              "UPDATE open={2}, close={3}, high={4}, low={5}, volume={6};"\
-              "".format(code, values, p_open, p_close, p_high, p_low, volume_q)
+        sql = f"INSERT INTO c_{code}(date, open, close, high, low, volume) VALUES {values} "\
+              f"ON DUPLICATE KEY "\
+              f"UPDATE open={p_open}, close={p_close}, high={p_high}, low={p_low}, volume={volume_q};"
         self.cur.execute(sql)
 
-    def update_investor_in_chart(self, code, date, fore, inst, indi):
+    def insert_investor_into_chart(self, code, date, fore, inst, indi):
         date = date.strftime('%Y-%m-%d')
-        sql = "UPDATE c_{0} SET "\
-              "fore={1}, inst={2}, indi={3} WHERE date='{4}';"\
-              "".format(code, fore, inst, indi, date)
+        values = (date, fore, inst, indi)
+        sql = f"INSERT INTO c_{code}(date, fore, inst, indi) VALUES {values} "\
+              f"ON DUPLICATE KEY "\
+              f"UPDATE fore={fore}, inst={inst}, indi={indi};"
         self.cur.execute(sql)
 
     def get_all_from_chart(self, code):
@@ -177,6 +176,19 @@ class StockDB():
             sql = "SELECT * FROM c_{0} WHERE date='{1}'".format(code, date)
         self.cur.execute(sql)
         data = self.cur.fetchone()
+        return data
+
+    def get_range_from_chart(self, code, start_date, end_date):
+        '''
+        return chart column value(price, indi,fore,inst quantity)
+        :param code: company code
+        :param start_date: start date in chart table
+        :param end_date: end date in chart table
+        :return: chart table data from start date to end date
+        '''
+        sql = "SELECT * FROM c_{0} WHERE date BETWEEN '{1}' AND '{2}';".format(code, start_date, end_date)
+        self.cur.execute(sql)
+        data = self.cur.fetchall()
         return data
 
     #####################################################################
@@ -357,6 +369,13 @@ class StockDB():
         
         return price_list
     
-    
+'''    
 if __name__ == '__main__':
-    pass
+    db = StockDB(user_id=config.DB['USER_ID'],
+                 norm_pwd=config.DB['NORM_PWD'],
+                 db_name=config.DB['DB_NAME'])
+    db.open()
+    data = db.get_range_from_chart('005930', datetime.date(2000,1,2), datetime.date(2000,12,31))
+    print(data)
+    db.close()
+'''
