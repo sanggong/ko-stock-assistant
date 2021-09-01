@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-##################### Kiwoom.py ########################
+##################### kiwoom.py ########################
 
 - This is Class file for using Kiwoom Investment Open API.
 - Some method operate transmitting Kiwwom server and receiving event.
@@ -31,6 +31,7 @@ LIMIT_TR_COUNT = 99
 
 EVENT_RESPONSE_TIME_LIMIT = 6000  # ms
 LOGIN_RESPONSE_TIME_LIMIT = 15000 # ms
+
 
 class Kiwoom(QAxWidget):
     def __init__(self):

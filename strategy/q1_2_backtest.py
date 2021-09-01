@@ -5,15 +5,15 @@ Created on Thu Apr 30 15:02:01 2020
 @author: ksme0
 """
 
-from qpkg import Trader
+from kostock import backtester
 from config import configBacktest
-from qpkg.StockDB import StockDB
+from kostock.stockdb import StockDB
 import datetime
 
 list_data = []
 temp_codes = []
 date = None
-bt = Trader.BackTester()
+bt = backtester.BackTester()
 db = StockDB(configBacktest.DB['USER_ID'], configBacktest.DB['NORM_PWD'], configBacktest.DB['STOCK_DB'])
 db.open()
 

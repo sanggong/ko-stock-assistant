@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-StockDB.py
+stockdb.py
 
 this module handle MariaDB stock database
 """
 
 import MySQLdb as mysql
 
-class StockDB():
+
+class StockDB:
     def __init__(self, user_id, norm_pwd, db_name):
         self.user_id = user_id
         self.norm_pwd = norm_pwd
@@ -45,7 +46,7 @@ class StockDB():
         self.cur.execute(sql)
     
     # sinfo DML - DELETE, INSERT, UPDATE
-    def delete_row_from_sinfo(self, code): # code[str] : company code (6 digit)
+    def delete_row_from_sinfo(self, code):  # code[str] : company code (6 digit)
         sql = "DELETE FROM stock_info WHERE code='{0}';".format(code)
         self.cur.execute(sql)
     
@@ -68,7 +69,7 @@ class StockDB():
     def get_code_list_from_sinfo(self):
         '''
         get code list from stock info table
-        :return :data[2dim-tuple] code list((code1,), (code2),...)
+        :return :data[1dim] code list(code1, code2,...)
         '''
         sql = 'SELECT code FROM stock_info;'
         self.cur.execute(sql)
@@ -190,6 +191,17 @@ class StockDB():
         self.cur.execute(sql)
         data = self.cur.fetchall()
         return data
+
+    def get_ohlc_limit_from_chart(self, code, date, prev_days):
+        '''
+        return chart colum value(price, institution quantity) from date-prev_days to date
+        :param code: code: company code
+        :param date: start date in chart table
+        :param days: it is used limit
+        :return: chart table data from date-prev_days to date
+        '''
+        sql = f"SELECT date, close, open, low, high FROM c_{code} WHERE date <= '{date}' "\
+              f"ORDER BY date DESC LIMIT {prev_days};"
 
     #####################################################################
     # META UPDATE TABLE METHOD
@@ -344,23 +356,20 @@ class StockDB():
         
         date = date.strftime('%Y-%m-%d')
         price_list = []
-        sql = f"SELECT close FROM c_{code} WHERE date <= '{date}' "\
-              f"ORDER BY date DESC LIMIT 2"
+        sql = f"SELECT close FROM c_{code} WHERE date < '{date}' "\
+              f"ORDER BY date DESC LIMIT 1"
         self.cur.execute(sql)
-        two_days = self.cur.fetchall()
-        if len(two_days) == 2:
-            price_list.extend([two_days[0][0], two_days[1][0]])
-        elif len(two_days) == 1:
-            price_list.extend([float['nan'], two_days[0][0]])
+        prev_day = self.cur.fetchone()
+        if prev_day:
+            price_list.append(prev_day[0])
         else:
             return [float('nan') for _ in range(number_of_days + 2)]
 
-        sql = f"SELECT close FROM c_{code} WHERE date > '{date}' "\
-              f"ORDER BY date ASC LIMIT {number_of_days}"
+        sql = f"SELECT close FROM c_{code} WHERE date >= '{date}' "\
+              f"ORDER BY date ASC LIMIT {number_of_days + 1}"
         self.cur.execute(sql)
         two_dim = self.cur.fetchall()
-        temp_list = [price for one_dim in two_dim for price in one_dim]
-        price_list.extend(temp_list)
+        price_list.extend([price for one_dim in two_dim for price in one_dim])
 
         if len(price_list) < number_of_days + 2:
             nan_len = (number_of_days + 2) - len(price_list)
@@ -369,7 +378,7 @@ class StockDB():
         
         return price_list
     
-'''    
+
 if __name__ == '__main__':
     db = StockDB(user_id=config.DB['USER_ID'],
                  norm_pwd=config.DB['NORM_PWD'],
@@ -378,4 +387,3 @@ if __name__ == '__main__':
     data = db.get_range_from_chart('005930', datetime.date(2000,1,2), datetime.date(2000,12,31))
     print(data)
     db.close()
-'''

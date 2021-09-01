@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Trader.py
+backtester.py
 
 this is backtest module
 """
 from collections import defaultdict
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import datetime
@@ -13,8 +12,9 @@ import copy
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.mysql import DATE, FLOAT, INTEGER, VARCHAR
 from tqdm import tqdm
-from qpkg import qutils
-from frechetdist import frdist
+from kostock import qutils
+from kostock.frechetdist import frdist
+from kostock.plot import Plot
 
 
 class ArgumentError(Exception):
@@ -22,7 +22,8 @@ class ArgumentError(Exception):
 class ClassOperationError(Exception):
     pass
 
-class BackTester():
+
+class BackTester:
     def __init__(self, db=None):
         self._test_list = [] # (,3) dim list. [['code', 'date', 'group'], ...]
         self._code_nums = defaultdict(int)
@@ -61,6 +62,13 @@ class BackTester():
 
     def get_test_list(self):
         return copy.deepcopy(self._test_list)
+
+    def show_test_list(self, number_of_days=130):
+        for code, date, grp in self._test_list:
+            ohlc = self._db.get_ohlc_limit_from_chart(code, date, number_of_days)
+
+
+
 
     def back_test(self, number_of_days=130):
         '''
@@ -115,7 +123,7 @@ class BackTester():
                 sc = result['code'] == stat
                 result.loc[gc & sc, days] = stat_func(result.loc[gc, days], axis=0)
 
-        return testResult(result, group_list)
+        return TestResult(result, group_list)
 
     def ins_chart_pattern(self, code, pattern, threshold=10, window_size=60, window_move=None, group='1',
                           price_opt='c', moving_avg=None, min_diff_ratio=0, max_diff_ratio=float('inf'),
@@ -244,7 +252,8 @@ class BackTester():
                     return True
         return False
 
-class testResult():
+
+class TestResult:
     '''
     This class has result of back test.
     :attribute: self.result[DataFrame] profit ratio and statistics data by code and date.
@@ -318,34 +327,25 @@ class testResult():
         Show two graph in different window.
         one is mean/geometric mean graph, another is standard deviation graph over time
         '''
-        color = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                 '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
         cols = self._result.columns[6:]
         int_cols = pd.to_numeric(cols.str.replace('_', ''))
-        # mean, g_mean graph
-        plt.figure('Profit Graph')
-        for i, group in enumerate(self._groups):
-            gc = self._result['grp'] == group
-            sc_mean = self._result['code'] == 'mean'
-            sc_gmean = self._result['code'] == 'g_mean'
+        means, gmeans, stds, groups = [], [], [], []
+        for group in self._groups:
+            gc = (self._result['grp'] == group)
+            sc_mean = (self._result['code'] == 'mean')
+            sc_gmean = (self._result['code'] == 'g_mean')
+            sc_std = (self._result['code'] == 'stddev')
             mean = self._result.loc[gc & sc_mean, cols].squeeze()  # change (1, days) into (days,)
-            g_mean = self._result.loc[gc & sc_gmean, cols].squeeze()  # change (1, days) into (days,)
-            plt.plot(int_cols, mean, color=color[i], label=f"[G_{group}] mean", linestyle='-')
-            plt.plot(int_cols, g_mean, color=color[i], label=f"[G_{group}] g_mean", linestyle='-.')
-        plt.title('Profit Graph')
-        plt.xlabel('Days')
-        plt.legend()
-
-        # stddev graph
-        plt.figure('Stddev Graph')
-        for i, group in enumerate(self._groups):
-            gc = self._result['grp'] == group
-            sc_std = self._result['code'] == 'stddev'
+            gmean = self._result.loc[gc & sc_gmean, cols].squeeze()  # change (1, days) into (days,)
             std = self._result.loc[gc & sc_std, cols].squeeze()  # change (1, days) into (days,)
-            plt.plot(int_cols, std, color=color[i], label=f"[G_{group}] stddev")
-        plt.title('Stddev Graph')
-        plt.xlabel('Days')
-        plt.legend()
+            groups.append(group)
+            means.append(mean)
+            gmeans.append(gmean)
+            stds.append(std)
+
+        plt = Plot()
+        plt.plot_profit(int_cols, groups, means, gmeans)
+        plt.plot_profit_stddev(int_cols, groups, stds)
         plt.show()
 
     def set_bt_db(self, user_id, norm_pwd, db_name):
