@@ -36,5 +36,5 @@ class Plot:
         plt.title('Stddev Graph')
         plt.xlabel('Days')
         plt.legend()
-        for i, stddev, group in enumerate(zip(stddevs, groups))
+        for i, stddev, group in enumerate(zip(stddevs, groups)):
             plt.plot(day, stddev, color=Plot.color[i], label=f"[G_{group}] stddev")
