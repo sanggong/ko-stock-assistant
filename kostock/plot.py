@@ -1,4 +1,9 @@
+import mplfinance as mpf
+import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
+from datetime import datetime
+import pandas as pd
+import numpy as np
 
 class Plot:
 
@@ -11,8 +16,12 @@ class Plot:
     def show(self):
         plt.show()
 
-    def plot_ohlc(self):
-        pass
+    def plot_ohlc_all(self, data):
+        '''
+        :param data: [{code:code0, df:dataframe0(ohlc)}, {code:code1, df:dataframe1(ohlc)}, ...]
+        :return:
+        '''
+        mpf.plot(data[0]['df'])
 
     def plot_profit(self, day, groups, means, gmeans):
         '''

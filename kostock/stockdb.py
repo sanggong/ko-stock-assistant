@@ -192,7 +192,7 @@ class StockDB:
         data = self.cur.fetchall()
         return data
 
-    def get_ohlc_limit_from_chart(self, code, date, prev_days):
+    def get_ohlc_prev_from_chart(self, code, date, prev_days):
         '''
         return chart colum value(price, institution quantity) from date-prev_days to date
         :param code: code: company code
@@ -200,8 +200,11 @@ class StockDB:
         :param days: it is used limit
         :return: chart table data from date-prev_days to date
         '''
-        sql = f"SELECT date, close, open, low, high FROM c_{code} WHERE date <= '{date}' "\
+        sql = f"SELECT date, open, close, high, low, volume FROM c_{code} WHERE date <= '{date}' "\
               f"ORDER BY date DESC LIMIT {prev_days};"
+        self.cur.execute(sql)
+        data = self.cur.fetchall()
+        return data
 
     #####################################################################
     # META UPDATE TABLE METHOD
@@ -377,13 +380,3 @@ class StockDB:
             price_list.extend(nan_list)
         
         return price_list
-    
-
-if __name__ == '__main__':
-    db = StockDB(user_id=config.DB['USER_ID'],
-                 norm_pwd=config.DB['NORM_PWD'],
-                 db_name=config.DB['DB_NAME'])
-    db.open()
-    data = db.get_range_from_chart('005930', datetime.date(2000,1,2), datetime.date(2000,12,31))
-    print(data)
-    db.close()

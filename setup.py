@@ -4,16 +4,16 @@ setup_requires = [
       ]
 
 install_requires = [
-      'numpy==1.17.0',
-      'pandas==1.0.5',
-      'tqdm==4.47.0',
-      'matplotlib==3.3.3',
-      'mplfinance==0.12.7a5',
-      'mysqlclient==1.4.6',
-      'QtPy==1.9.0',
-      'SQLAlchemy==1.3.18',
-      'requests==2.24.0',
-      'beautifulsoup4==4.9.1',
+      'numpy>=1.17.0',
+      'pandas>=1.0.5',
+      'tqdm>=4.47.0',
+      'matplotlib>=3.3.3',
+      'mplfinance>=0.12.7a5',
+      'mysqlclient>=1.4.6',
+      'QtPy>=1.9.0',
+      'SQLAlchemy>=1.3.18',
+      'requests>=2.24.0',
+      'beautifulsoup4>=4.9.1',
       ]
 
 setup(name='ko-stock-assistant',

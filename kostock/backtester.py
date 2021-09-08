@@ -11,7 +11,6 @@ import datetime
 import copy
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.mysql import DATE, FLOAT, INTEGER, VARCHAR
-from tqdm import tqdm
 from kostock import qutils
 from kostock.frechetdist import frdist
 from kostock.plot import Plot
@@ -64,11 +63,19 @@ class BackTester:
         return copy.deepcopy(self._test_list)
 
     def show_test_list(self, number_of_days=130):
+        cols = ['Date', 'Open', 'Close', 'High', 'Low', 'Volume']
+        data = []
         for code, date, grp in self._test_list:
-            ohlc = self._db.get_ohlc_limit_from_chart(code, date, number_of_days)
-
-
-
+            ohlc = self._db.get_ohlc_prev_from_chart(code[:6], date, number_of_days)
+            df_ohlc = pd.DataFrame(data=ohlc, columns=cols)
+            print(df_ohlc.dtypes)
+            df_ohlc.astype({'Date': 'datetime64'})
+            print(df_ohlc.dtypes)
+            df_ohlc.set_index('Date', inplace=True)
+            print(df_ohlc.dtypes)
+            data.append({'code': code, 'df': df_ohlc})
+        plt = Plot()
+        plt.plot_ohlc_all(data)
 
     def back_test(self, number_of_days=130):
         '''
@@ -157,7 +164,9 @@ class BackTester:
 
         max_pat, min_pat = max(pattern), min(pattern)
         pat_diff = max_pat - min_pat
-        for i in tqdm(range(0, len(chart), window_move)):
+
+        days = 0
+        while days < len(chart):
             part_chart = chart[i:i+window_size]
             if len(part_chart) < window_size:
                 break
@@ -170,6 +179,9 @@ class BackTester:
                 if frdist(fr_cht, fr_pat) < threshold:
                     date = chart.index[i+window_size-1]
                     self.insert([code, date, group])
+                    days += window_size
+                    continue
+            days += window_move
 
     def _choose_chart_price(self, chart, price_opt, avg_window=None):
         columns = ['date', 'open', 'close', 'high', 'low',
