@@ -20,9 +20,7 @@ class BackTesterTestCase(unittest.TestCase):
     def test_show_test_list(self):
         bt = BackTester(self.db)
         bt.insert(['005930', datetime.date(2000, 12, 30), '1'])
-        print(bt._test_list)
         bt.show_test_list()
-        self.assertEqual(True, False)
 
 
 if __name__ == '__main__':

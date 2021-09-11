@@ -68,11 +68,8 @@ class BackTester:
         for code, date, grp in self._test_list:
             ohlc = self._db.get_ohlc_prev_from_chart(code[:6], date, number_of_days)
             df_ohlc = pd.DataFrame(data=ohlc, columns=cols)
-            print(df_ohlc.dtypes)
-            df_ohlc.astype({'Date': 'datetime64'})
-            print(df_ohlc.dtypes)
+            df_ohlc['Date'] = df_ohlc['Date'].astype('datetime64[ns]')
             df_ohlc.set_index('Date', inplace=True)
-            print(df_ohlc.dtypes)
             data.append({'code': code, 'df': df_ohlc})
         plt = Plot()
         plt.plot_ohlc_all(data)
