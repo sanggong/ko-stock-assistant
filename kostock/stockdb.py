@@ -204,7 +204,7 @@ class StockDB:
               f"ORDER BY date DESC LIMIT {prev_days};"
         self.cur.execute(sql)
         data = self.cur.fetchall()
-        return data
+        return data[::-1]
 
     #####################################################################
     # META UPDATE TABLE METHOD

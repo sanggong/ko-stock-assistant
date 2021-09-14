@@ -20,6 +20,7 @@ class BackTesterTestCase(unittest.TestCase):
     def test_show_test_list(self):
         bt = BackTester(self.db)
         bt.insert(['005930', datetime.date(2000, 12, 30), '1'])
+        bt.insert(['005930', datetime.date(2001, 1, 20), '1'])
         bt.show_test_list()
 
 

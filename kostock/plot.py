@@ -1,9 +1,11 @@
 import mplfinance as mpf
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import math
 
 class Plot:
 
@@ -21,7 +23,45 @@ class Plot:
         :param data: [{code:code0, df:dataframe0(ohlc)}, {code:code1, df:dataframe1(ohlc)}, ...]
         :return:
         '''
-        mpf.plot(data[0]['df'])
+
+        page, limit = 0, min(8, len(data))
+        fig = mpf.figure(figsize=(12,9), style='yahoo')
+
+        axes = []
+        for i in range(limit):
+            ax = fig.add_subplot(2, 3, i+1)
+            axes.append(ax)
+            mpf.plot(data[i]['df'], ax=ax, type='candle', axtitle=data[i]['code'])
+
+        def button_prev(event):
+            nonlocal page, limit
+            nonlocal data
+            nonlocal axes
+            page = (page - 1) if page > 0 else math.ceil(len(data) / limit) - 1
+            replot_ohlc(axes, page, limit)
+
+        def button_next(event):
+            nonlocal page, limit
+            nonlocal data
+            nonlocal axes
+            page = (page + 1) % math.ceil(len(data) / limit)
+            replot_ohlc(axes, page, limit)
+
+        def replot_ohlc(axes, page, limit):
+            for i, ax in enumerate(axes):
+                ax.clear()
+                idx = i + (page * limit)
+                mpf.plot(data[idx]['df'], ax=ax, type='candle', axtitle=data[idx]['code'])
+
+        axprev = fig.add_axes([0.7, 0.05, 0.1, 0.075])
+        axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
+        bprev = Button(axprev, '◀')
+        bnext = Button(axnext, '▶')
+        bnext.on_clicked(button_next)
+        bprev.on_clicked(button_prev)
+
+        mpf.show()
+
 
     def plot_profit(self, day, groups, means, gmeans):
         '''

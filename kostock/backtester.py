@@ -71,8 +71,11 @@ class BackTester:
             df_ohlc['Date'] = df_ohlc['Date'].astype('datetime64[ns]')
             df_ohlc.set_index('Date', inplace=True)
             data.append({'code': code, 'df': df_ohlc})
-        plt = Plot()
-        plt.plot_ohlc_all(data)
+        if data:
+            plt = Plot()
+            plt.plot_ohlc_all(data)
+        else:
+            print("There is no data for show_test_list()")
 
     def back_test(self, number_of_days=130):
         '''
