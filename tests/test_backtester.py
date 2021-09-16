@@ -1,5 +1,6 @@
 import unittest
 import datetime
+from datetime import timedelta
 
 from config import config
 
@@ -19,10 +20,9 @@ class BackTesterTestCase(unittest.TestCase):
 
     def test_show_test_list(self):
         bt = BackTester(self.db)
-        bt.insert(['005930', datetime.date(2000, 12, 30), '1'])
-        bt.insert(['005930', datetime.date(2001, 1, 20), '1'])
+        for i in range(10):
+            bt.insert(['005930', datetime.date(2000, 12, 30) + timedelta(days=i*10), '1'])
         bt.show_test_list()
-
 
 if __name__ == '__main__':
     unittest.main()
