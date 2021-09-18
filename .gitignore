@@ -11,6 +11,4 @@ config.py
 .idea/vcs.xml
 __pycache__/
 kostock/__pycache__/
-self_test.py
 tests/__pycache__/
-tests/test_frechetdist.py
