@@ -26,7 +26,10 @@ setup(name='ko-stock-assistant',
       packages=find_packages(),
       install_requires=install_requires,
       setup_requires=setup_requires,
-      classifiers=[],  # check!
+      python_requires='=3.6',
+      classifiers=[
+            'Operating System :: Microsoft :: Windows',
+            'Programming Language :: Python :: 3.6',
+      ],
       long_description=open('README.md').read(),
-      zip_safe=False, # check!
-      test_suite='nose.collector') # check!
+      zip_safe=False)
