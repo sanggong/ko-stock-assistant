@@ -1,2 +1,16 @@
 # ignore configuration file
 config.py
+
+# ignore unversioned file
+.idea/.gitignore
+.idea/.name
+.idea/inspectionProfiles/
+.idea/ko-stock-assistant.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+__pycache__/
+kostock/__pycache__/
+self_test.py
+tests/__pycache__/
+tests/test_frechetdist.py
