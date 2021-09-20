@@ -15,10 +15,7 @@ class Plot:
     def __init__(self):
         pass
 
-    def show(self):
-        plt.show()
-
-    def plot_ohlc_all(self, data):
+    def plot_ohlc_all(self, data, block=True):
         '''
         :param data: [{code:code0, df:dataframe0(ohlc)}, {code:code1, df:dataframe1(ohlc)}, ...]
         :return:
@@ -26,6 +23,7 @@ class Plot:
         page, limit = 0, min(8, len(data))   # page starts 0
         max_page = math.ceil(len(data) / limit)
         fig = mpf.figure(figsize=(12,9), style='yahoo')
+        fig.subplots_adjust(left=0.03, bottom=0.2, right=0.95, top=0.95, hspace=0.2)
 
         axes = []
         for i in range(limit):
@@ -71,10 +69,10 @@ class Plot:
         axtext = fig.add_axes([0.5, 0.05, 0.1, 0.075])
         axtext.text(0.4, 0.2, '{:2d} / {:2d}'.format(page+1, max_page))
 
-        mpf.show()
+        mpf.show(block=block)
 
 
-    def plot_profit(self, day, groups, means, gmeans):
+    def plot_profit(self, day, groups, means, gmeans, block=True):
         '''
         Set plot about profit mean and geometric mean
         day : x-axis
@@ -87,8 +85,9 @@ class Plot:
         for i, mean, gmean, group in enumerate(zip(means, gmeans, groups)):
             plt.plot(day, mean, color=Plot.color[i], label=f"[G_{group}] mean", linestyle='-')
             plt.plot(day, gmean, color=Plot.color[i], label=f"[G_{group}] g_mean", linestyle='-.')
+        plt.show(block=block)
 
-    def plot_profit_stddev(self, day, groups, stddevs):
+    def plot_profit_stddev(self, day, groups, stddevs, block=True):
         '''
         Set plot about profit standard deviation
         '''
@@ -98,3 +97,4 @@ class Plot:
         plt.legend()
         for i, stddev, group in enumerate(zip(stddevs, groups)):
             plt.plot(day, stddev, color=Plot.color[i], label=f"[G_{group}] stddev")
+        plt.show(block=block)

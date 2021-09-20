@@ -10,10 +10,11 @@ install_requires = [
       'matplotlib>=3.3.3',
       'mplfinance>=0.12.7a5',
       'mysqlclient>=1.4.6',
-      'QtPy>=1.9.0',
+      'pyqt5>=5.15.4',
       'SQLAlchemy>=1.3.18',
       'requests>=2.24.0',
       'beautifulsoup4>=4.9.1',
+      'pywinauto>=0.6.8'
       ]
 
 setup(name='ko-stock-assistant',

@@ -132,7 +132,7 @@ class BackTester:
 
         return TestResult(result, group_list)
 
-    def ins_chart_pattern(self, code, pattern, threshold=10, window_size=60, window_move=None, group='1',
+    def ins_chart_pattern(self, code, pattern, threshold=None, window_size=60, window_move=None, group='1',
                           price_opt='c', moving_avg=None, min_diff_ratio=0, max_diff_ratio=float('inf'),
                           start_date=None, end_date=None):
         """
@@ -165,25 +165,37 @@ class BackTester:
         max_pat, min_pat = max(pattern), min(pattern)
         pat_diff = max_pat - min_pat
 
+        if threshold is None:
+            threshold = (window_size * pat_diff) / 200
+
         days = 0
         while days < len(chart):
-            part_chart = chart[i:i+window_size]
+            part_chart = chart[days:days+window_size]
             if len(part_chart) < window_size:
                 break
             max_val, min_val = max(part_chart), min(part_chart)
             cht_diff = max_val - min_val
             cht_diff_ratio = cht_diff / min_val * 100  # percent unit
+
             if min_diff_ratio <= cht_diff_ratio <= max_diff_ratio:
-                fr_cht = part_chart * (pat_diff / cht_diff) + min_pat
+                fr_cht = (part_chart - min_val) * (pat_diff / cht_diff) + min_pat
                 fr_cht = [[j, data] for j, data in enumerate(fr_cht)] # convert pd.Series to list
+
                 if frdist(fr_cht, fr_pat) < threshold:
-                    date = chart.index[i+window_size-1]
+                    date = chart.index[days+window_size-1]
                     self.insert([code, date, group])
                     days += window_size
                     continue
             days += window_move
 
     def _choose_chart_price(self, chart, price_opt, avg_window=None):
+        '''
+        calculate average chart prices(c:close, o:open, h:high, l:low) by option
+        :param chart: chart data
+        :param price_opt: c:close, o:open, h:high, l:low
+        :param avg_window: average by date like moving average.
+        :return: [pd.Series] index:date / data:average price
+        '''
         columns = ['date', 'open', 'close', 'high', 'low',
                    'volume', 'fore', 'inst', 'indi']
         df_chart = pd.DataFrame(data=chart, columns=columns)
@@ -194,8 +206,9 @@ class BackTester:
         if 'l' in price_opt: df_chart['price'] += df_chart['low']
         df_chart['price'] /= len(price_opt)
 
-        ret_chart = pd.Series(data=df_chart['price'],
+        ret_chart = pd.Series(data=df_chart['price'].to_numpy(),
                               index=df_chart['date'])
+
         if avg_window:
             ret_chart = ret_chart.rolling(window=avg_window, center=True, min_periods=1).mean()
         return ret_chart
