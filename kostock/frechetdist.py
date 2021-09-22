@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from numba import jit
 import numpy as np
+import math
 
+@jit(nopython=True)
 def _c(ca, i, j, p, q):
 
     if ca[i, j] > -1:
@@ -23,7 +25,7 @@ def _c(ca, i, j, p, q):
             np.linalg.norm(p[i]-q[j])
             )
     else:
-        ca[i, j] = float('inf')
+        ca[i, j] = math.inf
 
     return ca[i, j]
 
@@ -67,8 +69,8 @@ def frdist(p, q):
 
     Parameters
     ----------
-    P : Input curve - two dimensional array of points
-    Q : Input curve - two dimensional array of points
+    p : Input curve - two dimensional array of points
+    q : Input curve - two dimensional array of points
 
     Returns
     -------
@@ -77,15 +79,15 @@ def frdist(p, q):
 
     Examples
     --------
-    >>> from frechetdist import frdist
-    >>> P=[[1,1], [2,1], [2,2]]
-    >>> Q=[[2,2], [0,1], [2,4]]
-    >>> frdist(P,Q)
-    >>> 2.0
-    >>> P=[[1,1], [2,1], [2,2]]
-    >>> Q=[[1,1], [2,1], [2,2]]
-    >>> frdist(P,Q)
-    >>> 0
+    >> from frechetdist import frdist
+    >> P=[[1,1], [2,1], [2,2]]
+    >> Q=[[2,2], [0,1], [2,4]]
+    >> frdist(P,Q)
+    >> 2.0
+    >> P=[[1,1], [2,1], [2,2]]
+    >> Q=[[1,1], [2,1], [2,2]]
+    >> frdist(P,Q)
+    >> 0
     """
     p = np.array(p, np.float64)
     q = np.array(q, np.float64)

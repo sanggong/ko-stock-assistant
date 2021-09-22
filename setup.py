@@ -15,6 +15,8 @@ install_requires = [
       'requests>=2.24.0',
       'beautifulsoup4>=4.9.1',
       'pywinauto>=0.6.8'
+      'numba==0.53.1',
+      'scipy==1.5.4'
       ]
 
 setup(name='ko-stock-assistant',

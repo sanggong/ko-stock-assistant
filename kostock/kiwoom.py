@@ -487,6 +487,8 @@ class Kiwoom(QAxWidget):
                     break
             if proc.name == 'Open API Login':
                 break
+            time.sleep(0.1)
+
         login_app = pywinauto.Application().connect(process=proc.process_id)
         login_dig = login_app.OpenAPILogin
         login_dig.Edit1.send_keystrokes(user_id)
@@ -516,17 +518,12 @@ class Kiwoom(QAxWidget):
         :param cert_pwd:[str] certification passward for real server
         :param is_mock:[bool] whether you login mock server(True) or not(False)
         '''
+
         pool = ThreadPool(processes=1)
         login_th = pool.apply_async(self._login_input,
                                     kwds={'user_id': user_id, 'norm_pwd': norm_pwd,
                                           'cert_pwd': cert_pwd, 'is_mock': is_mock})
-        '''
-        login_th = Thread(target=self._login_input,
-                          kwargs={'user_id': user_id, 'norm_pwd': norm_pwd, 'cert_pwd': cert_pwd,
-                                  'is_mock': is_mock})
-        login_th.daemon = True
-        login_th.start()
-        '''
+
         self.comm_connect()
         if not self.get_connect_state():
             login_pid = login_th.get()

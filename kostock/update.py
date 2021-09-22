@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Aug  6 16:38:57 2020
+update.py
 
-@author: ksme0
+Create and update stock database
+
 """
 from kostock.stockdb import StockDB
 from config import configUpdate
@@ -24,7 +25,7 @@ import time
 
 class Update:
     def run(self):
-        #freeze_support()
+        # freeze_support()
         log = logs.Log()
         logger = log.config_log(configUpdate.LOG_PATH, name='file')
         db = StockDB(user_id=configUpdate.DB['USER_ID'],
@@ -88,7 +89,7 @@ class Update:
                                                            configUpdate.CLOSED_DAYS_EXCEL_PATH)
         # sinfo update date is based on WICS index and its website process update at almost 3AM.
         # So previous day will be chosen to be sinfo update date.
-        return (sinfo_update_date, chart_update_date)
+        return [sinfo_update_date, chart_update_date]
 
     def check_sinfo_update(self, db, update_date):
         latest_sinfo = db.get_sinfo_from_meta()
@@ -103,10 +104,6 @@ class Update:
         # there is no data in the stock market closed day and before market open.
         # weekends, Jan 1, Dec 31 etc
 
-        # app = Kiwoom.QApplication(sys.argv)
-        # kiwoom = Kiwoom.Kiwoom()
-        # kiwoom.manual_login(user_id=configUpdate.KIWOOM[0]['USER_ID'],
-        #                    norm_pwd=configUpdate.KIWOOM[0]['NORM_PWD'])
         logger = logs.Log().get_logger('file')
         old_code_list = tuple(i[0] for i in db.get_code_list_from_sinfo())
         new_code_list = []
@@ -413,206 +410,3 @@ class Update:
             update_list = [[code, update_dict[code]['latest'], update_date] for code in update_dict]
             logger.debug('Pickle file does not exist. Data gathering starts from the beginning')
         return update_list
-
-    """
-    def update_chart_tables(update_dict, update_date):
-        n_procs = configUpdate.NUMBER_OF_PROCESS
-        sum_date = datetime.timedelta(days=0)
-        for date in update_dict.values():
-            sum_date = sum_date + (update_date - date['latest'])
-        dict_list = [{} for i in range(n_procs)]
-        date_amount = sum_date / n_procs
-        sum_date = datetime.timedelta(days=0)
-        idx = 0
-        for code in update_dict.keys():
-            sum_date = sum_date + (update_date - update_dict[code]['latest'])
-            dict_list[idx][code] = update_dict[code]
-            if sum_date > date_amount:
-                idx = idx + 1
-                sum_date = datetime.timedelta(days=0)
-        procs=[]
-        proc_time=[0 for i in range(n_procs)]
-        lock = Lock()
-        log_queue = Queue()
-        code_queue = Queue()
-        log = qutils.Log()
-        logger = log.config_queue_log(log_queue, name='queue')
-        total_pbar = len(update_dict)
-        prog = 0
-        log.listener_start(configUpdate.LOG_PATH, name='file', queue=log_queue)
-        with tqdm(total=total_pbar, ascii=True, desc='Chart Table UPDATE') as pbar:
-            for p_no in range(n_procs):
-                proc = Process(target=multi_chart_update,
-                               args=(dict_list[p_no], update_date, p_no,
-                                     lock, code_queue, log_queue))
-                procs.append(proc)
-                proc.start()
-                proc_time[p_no] = time.time()
-            while True:
-                quit_time = time.time()
-                for p_no in range(n_procs):
-                    #if quit_time - proc_time[p_no] > 50:
-                    #    procs[p_no].terminate()
-                    if (not procs[p_no].is_alive()) and (procs[p_no].exitcode != 0):
-                        logger.debug(f'PID_{p_no} terminated with code {procs[p_no].exitcode}')
-                        procs[p_no] = Process(target=multi_chart_update,
-                                              args=(dict_list[p_no], update_date, p_no,
-                                                    lock, code_queue, log_queue))
-                        procs[p_no].start()
-                while not code_queue.empty():
-                    code_queue.get()
-                    pbar.update(1) # one code done
-                    prog += 1
-                if len(update_dict) == prog:
-                    break
-                time.sleep(0.2)
-    
-        log.listener_end(log_queue)
-        for p_no in range(n_procs):
-            file_path = configUpdate.PROCESS_PICKLE_PATH + f'_{p_no}.pickle'
-            if isfile(file_path):
-                remove(file_path)
-    
-    
-    def multi_chart_update(update_dict, update_date, p_no, lock, code_queue, log_queue):
-        start_time = time.time()
-        log = qutils.Log()
-        logger = log.config_queue_log(log_queue, 'queue')
-        # CPU affinity
-        '''
-        n_cpus = psutil.cpu_count()
-        if p_no < (n_cpus//2):
-            affinity = [(p_no * 2 + 1) % n_cpus]
-        else:
-            affinity = [(p_no * 2) % n_cpus]
-        proc = psutil.Process()  # get self pid
-        proc.cpu_affinity(affinity)
-        '''
-        # Logic start
-        app = Kiwoom.QApplication(sys.argv)
-        kiwoom = Kiwoom.Kiwoom()
-        is_mock = True if p_no % 2 == 0 else False # check mock invest server mode
-        lock.acquire() # process lock
-        kiwoom.manual_login(user_id=configUpdate.KIWOOM[p_no//2]['USER_ID'],
-                            norm_pwd=configUpdate.KIWOOM[p_no//2]['NORM_PWD'],
-                            cert_pwd=configUpdate.KIWOOM[p_no//2]['CERT_PWD'],
-                            is_mock=is_mock)
-        if kiwoom.get_connect_state():
-            logger.debug('PID_{0} Kiwoom login success'.format(p_no))
-            lock.release()  # process unlock
-        else:
-            logger.debug('PID_{0} Kiwoom login fail, process terminated'.format(p_no))
-            lock.release()  # process unlock
-            exit(1)
-        db = StockDB(user_id=configUpdate.DB['USER_ID'],
-                     norm_pwd=configUpdate.DB['NORM_PWD'],
-                     db_name=configUpdate.DB['DB_NAME'])
-        db.open()
-    
-        code_tuple = tuple(update_dict.keys())
-        file_path = configUpdate.PROCESS_PICKLE_PATH + '_{0}.pickle'.format(p_no)
-        if isfile(file_path):
-            with open(file_path, 'rb') as f:
-                saved = pickle.load(f)
-                logger.debug('PID_{0} pickle load... {1}'.format(p_no, saved))
-                code = saved['code']
-                func = saved['func']
-                date = saved['date']
-                has_saved = True
-        else:
-            logger.debug('PID_{0} Pickle file does not exist. Data gathering starts from the beginning'.format(p_no))
-            code = code_tuple[0]
-            func = '10081'
-            date = update_date
-            has_saved = False
-    
-        state = 0
-        data = None
-        stt_idx = code_tuple.index(code)
-        for code in code_tuple[stt_idx:]:
-            if func == '10081':
-                try:
-                    state, data = kiwoom.req_opt10081(com_code=code, end_date=date,
-                                                      modi_price=True, start_date=update_dict[code]['latest'])
-                    for row in data.itertuples():
-                        db.insert_ohlc_into_chart(code, getattr(row, 'Index'), getattr(row, 'open'),
-                                                  getattr(row, 'close'), getattr(row, 'high'),
-                                                  getattr(row, 'low'), getattr(row, 'volume_q'))
-                except Exception as e:
-                    logger.error("PID_{0} code'{1}' 10081 Error'{2}'".format(p_no, code, e))
-                    code_queue.put(code)
-                    continue
-                if state == -1: # LIMIT TR COUNT
-                    break
-                func = '10060'
-                if has_saved:
-                    date = update_date
-                    has_saved = False
-                if update_dict[code]['last']:
-                # check par value change or stock increase or decrease
-                    before_price = db.get_recent_stock_price(code, data.index[-1])
-                    after_price = data.iloc[-1]['close']
-                    if before_price != after_price: # if price is not equal at the same day
-                        func = '10081_again'
-                        date = update_dict[code]['last']
-    
-            if func == '10081_again':
-                user_start = datetime.datetime.strptime(configUpdate.START_DATE, "%Y-%m-%d").date()
-                start_date = user_start if user_start > update_dict[code]['listing'] else update_dict[code]['listing']
-                try:
-                    state, data = kiwoom.req_opt10081(com_code=code, end_date=date,
-                                                      modi_price=True, start_date=start_date)
-                    for row in data.itertuples():
-                        db.insert_ohlc_into_chart(code, getattr(row, 'Index'), getattr(row, 'open'),
-                                                  getattr(row, 'close'), getattr(row, 'high'),
-                                                  getattr(row, 'low'), getattr(row, 'volume_q'))
-                except Exception as e:
-                    logger.error("PID_{0} code'{1}' 10081 Error'{2}'".format(p_no, code, e))
-                    code_queue.put(code)
-                    func = '10081'
-                    date = update_date
-                    continue
-                if state == -1:  # LIMIT TR COUNT
-                    break
-                func = '10060'
-                date = update_date
-                if has_saved:
-                    date = update_date
-                    has_saved = False
-    
-            if func == '10060':
-                try:
-                    state, data = kiwoom.req_opt10060(com_code=code, end_date=date, form_opt='MONEY',
-                                                      trade_opt='TOTAL', start_date=update_dict[code]['latest'])
-                    for row in data.itertuples():
-                        db.update_investor_in_chart(code, getattr(row, 'Index'), getattr(row, 'fore'),
-                                                    getattr(row, 'inst'), getattr(row, 'indi'))
-                except Exception as e:
-                    logger.error("PID_{0} code'{1}' 10060 Error'{2}'".format(p_no, code, e))
-                    code_queue.put(code)
-                    func = '10081'
-                    continue
-                if state == -1:  # LIMIT TR COUNT
-                    break
-                func = '10081'
-                if has_saved:
-                    date = update_date
-                    has_saved = False
-            code_queue.put(code)
-            db.update_chart_date_in_meta(code, date)
-            db.commit()
-    
-        exit_code = 0
-        if state == -1:
-            exit_code = 1
-            if not data.empty:
-                date = data.index[-1]
-            save = {'code': code, 'func': func, 'date': date}
-            with open(file_path, 'wb') as f:
-                pickle.dump(save, f)
-                logger.debug(f'PID_{p_no} pickle saving... {save}')
-        db.commit()
-        db.close()
-        logger.debug('PID_{0} terminated. time:{1:.2f}'.format(p_no, time.time()-start_time))
-        exit(exit_code)
-    """

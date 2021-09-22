@@ -13,6 +13,8 @@ class StockDB:
         self.user_id = user_id
         self.norm_pwd = norm_pwd
         self.db_name = db_name
+        self._db = None
+        self.cur = None
 
     def open(self):
         self._db = mysql.connect(host='localhost', user=self.user_id,
@@ -51,13 +53,13 @@ class StockDB:
         self.cur.execute(sql)
     
     def add_row_into_sinfo(self, code, name, wics_ls, wics_ms, market, num_stocks):
-        '''
+        """
         Insert or update data into stock info table.
         when code exist in stock info table, use 'INSERT'
         when not exist, use 'UPDATE'
         :PARAM :code[str] company code(6 digit) :name[str] company name :wics_ls[str] wics large sector
         :wics_ms[str] wics middle sector :market[str] kospi/kosdaq :num_stocks[int] number of stocks in market
-        '''
+        """
         values = (code, name, wics_ls, wics_ms, market, num_stocks, 0)
         sql = "INSERT INTO stock_info VALUES {0} "\
               "ON DUPLICATE KEY "\
@@ -67,35 +69,35 @@ class StockDB:
    
     # sinfo DML - SELECT
     def get_code_list_from_sinfo(self):
-        '''
+        """
         get code list from stock info table
         :return :data[1dim] code list(code1, code2,...)
-        '''
+        """
         sql = 'SELECT code FROM stock_info;'
         self.cur.execute(sql)
         data = self.cur.fetchall()
-        data = (c for code in data for c in code)
+        data = [c for code in data for c in code]
         return data
 
     def get_all_from_sinfo(self):
-        '''
+        """
         get all data from stock info table
         return
         * data[2-dim] : data about wics, name etc 
-        '''
+        """
         sql = 'SELECT * FROM stock_info;'
         self.cur.execute(sql)
         data = self.cur.fetchall()
         return data
     
     def get_one_from_sinfo(self, code):
-        '''
+        """
         get one data from stock info table
         parameter
         * code[str] : company code (6 digit)
         return
         * data[1-dim] : data about wics, name etc 
-        '''
+        """
         sql = "SELECT * FROM stock_info WHERE code='{0}';".format(code)
         self.cur.execute(sql)
         data = self.cur.fetchone()
@@ -105,7 +107,8 @@ class StockDB:
     # CANDLE CHART TABLE METHOD
     # ordered by DDL-DML
     # chart DDL
-    def create_chart_schema(self, code): # code[str] : company code (6 digit)
+    def create_chart_schema(self, code):
+        # code[str] : company code (6 digit)
         sql = 'CREATE TABLE c_{0}('\
               'date DATE PRIMARY KEY NOT NULL UNIQUE,'\
               'open INT UNSIGNED,'\
@@ -118,7 +121,8 @@ class StockDB:
               'indi INT);'.format(code)
         self.cur.execute(sql)
     
-    def drop_chart_schema(self, code): # code[str] : company code (6 digit)
+    def drop_chart_schema(self, code):
+        # code[str] : company code (6 digit)
         sql = "DROP TABLE c_{0};".format(code)
         self.cur.execute(sql)    
 
@@ -148,20 +152,20 @@ class StockDB:
         self.cur.execute(sql)
 
     def get_all_from_chart(self, code):
-        '''
+        """
         get all data from the one candle chart table
         parameter
         * code[str] : company code (6 digit)
         return
         * data[2-dim] : data about price, volume etc 
-        '''
+        """
         sql = "SELECT * FROM c_{0};".format(code)
         self.cur.execute(sql)
         data = self.cur.fetchall()
         return data
 
     def get_one_from_chart(self, code, date=None):
-        '''
+        """
         get one data from the one candle chart table
         if date is None, func returns latest data
         parameter
@@ -169,7 +173,7 @@ class StockDB:
         * date[date] : date 
         return
         * data[1-dim] : data about price, volume etc 
-        '''
+        """
         if date is None:
             sql = "SELECT * FROM c_{0} ORDER BY date DESC LIMIT 1".format(code)
         else:
@@ -180,26 +184,26 @@ class StockDB:
         return data
 
     def get_range_from_chart(self, code, start_date, end_date):
-        '''
+        """
         return chart column value(price, indi,fore,inst quantity)
         :param code: company code
         :param start_date: start date in chart table
         :param end_date: end date in chart table
         :return: chart table data from start date to end date
-        '''
+        """
         sql = "SELECT * FROM c_{0} WHERE date BETWEEN '{1}' AND '{2}';".format(code, start_date, end_date)
         self.cur.execute(sql)
         data = self.cur.fetchall()
         return data
 
     def get_ohlc_prev_from_chart(self, code, date, prev_days):
-        '''
+        """
         return chart colum value(price, institution quantity) from date-prev_days to date
         :param code: code: company code
         :param date: start date in chart table
-        :param days: it is used limit
+        :param prev_days: it is used limit
         :return: chart table data from date-prev_days to date
-        '''
+        """
         sql = f"SELECT date, open, close, high, low, volume FROM c_{code} WHERE date <= '{date}' "\
               f"ORDER BY date DESC LIMIT {prev_days};"
         self.cur.execute(sql)
@@ -219,9 +223,9 @@ class StockDB:
     
     # meta DML
     def update_sinfo_date_in_meta(self, update_date):
-        '''
+        """
         insert or update stock info update date
-        '''
+        """
         update_date = update_date.strftime('%Y-%m-%d')
         sql = "INSERT INTO meta_update(table_name, update_date) "\
               "VALUES ('stock_info', '{0}') ON DUPLICATE KEY "\
@@ -246,22 +250,22 @@ class StockDB:
         self.cur.execute(sql)
 
     def get_sinfo_from_meta(self):
-        '''
+        """
         get sinfo data from meta update table
         return
         * data[1-dim] : update data for sinfo 
-        '''
+        """
         sql = "SELECT * FROM meta_update WHERE table_name='stock_info';"
         self.cur.execute(sql)
         data = self.cur.fetchone()
         return data
     
     def get_chart_from_meta(self):
-        '''
+        """
         get candle chart data from meta update table
         return
         * data[2-dim] : data about wics, name etc 
-        '''
+        """
         sql = "SELECT * FROM meta_update WHERE table_name LIKE 'c_%';"
         self.cur.execute(sql)
         data = self.cur.fetchall()
@@ -269,7 +273,7 @@ class StockDB:
 
     #####################################################################
     def conv_code_to_name(self, code):
-        '''
+        """
         - it returns stock name corresponding code
         
         input : * code [str]
@@ -277,7 +281,7 @@ class StockDB:
         
         output : * stock_name [str]
                  - KOREAN stock name 
-        '''
+        """
         sql = "SELECT name FROM Stock WHERE code='{0}';".format(code)
         self.cur.execute(sql)
         stock_name = self.cur.fetchone()
@@ -288,7 +292,7 @@ class StockDB:
             return stock_name[0]
     
     def conv_name_to_code(self, name):
-        '''
+        """
         - it returns stock code corresponding name
         
         input : * name [str]
@@ -296,7 +300,7 @@ class StockDB:
         
         output : * stock_code [str]
                  - stock code (6 digit) 
-        '''        
+        """
         db_cmd = "SELECT code FROM stock_info WHERE name='{0}';".format(name)
         self.cur.execute(db_cmd)
         stock_code = self.cur.fetchone()
@@ -304,8 +308,7 @@ class StockDB:
             return None
         else:
             return stock_code[0]
-        
-    
+
     def get_stock_bucket(self):
         db_cmd = "SELECT * FROM Stock;"
         self.cur.execute(db_cmd)
@@ -313,11 +316,10 @@ class StockDB:
         stock_bucket = self.cur.fetchall()
         
         return stock_bucket
-    
-    
-    ### DML RELATED METHOD IN DAILY CANDLE TABLE ### 
+
+    # DML RELATED METHOD IN DAILY CANDLE TABLE ###
     def get_recent_stock_price(self, code, date):
-        '''
+        """
         ### _get_stock_price ###
         - this method returns stock price corresponding date and code
         - if stock price doesn't exist in the date, 
@@ -328,7 +330,7 @@ class StockDB:
                 - date
         output : * stock_price [int]
                  - stock price by input date and code
-        '''
+        """
         sql = "SELECT close FROM c_{0} WHERE date <= '{1}' ORDER BY date DESC LIMIT 1;".format(code, date)
         self.cur.execute(sql)
         p_close = self.cur.fetchone()
@@ -336,7 +338,7 @@ class StockDB:
         return ret_val
 
     def get_future_price_list(self, code,  date, number_of_days=130):
-        '''
+        """
         - this method access DB and make price list
         - price list is made of later input date price
         - its length is value of number_of_days 
@@ -355,7 +357,7 @@ class StockDB:
                 
         output : * price_list [one-dim list]
                  - price list by date
-        '''
+        """
         
         date = date.strftime('%Y-%m-%d')
         price_list = []

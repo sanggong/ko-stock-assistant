@@ -3,39 +3,41 @@ import logging.handlers
 from threading import Thread
 import platform
 
-class Log():
+
+class Log:
     def __init__(self):
         self.th = None
 
-    def get_logger(self, name):
+    @staticmethod
+    def get_logger(name):
         return logging.getLogger(name)
 
     def listener_start(self, file_path, name, queue):
-        '''
+        """
         Listener perform getting log data in Queue as consumer
         and writing log in way method self.config_log.
         Listener operate in new thread.
         :param file_path:[str] same file_path with method self.config_log
         :param name:[str] name assigned getLogger
         :param queue:[multiprocessing.Queue] Queue used in QueueHandler
-        '''
+        """
         self.th = Thread(target=self._proc_log_queue, args=(file_path, name, queue))
         self.th.start()
 
     def listener_end(self, queue):
-        '''
+        """
         Multiprocess log listener end method.
         :param queue:[multiprocessing.Queue] same queue with listener_start input queue.
-        '''
+        """
         queue.put(None)
         self.th.join()
         print('log listener end...')
 
     def _proc_log_queue(self, file_path, name, queue):
-        '''
+        """
         This function must be used in another thread
         :param queue: multiprocessing logging queue
-        '''
+        """
         self.config_log(file_path, name)
         logger = self.get_logger(name)
         while True:
@@ -45,29 +47,32 @@ class Log():
                     break
                 logger.handle(record)
             except Exception:
-                import sys, traceback
+                import sys
                 print('log problem', file=sys.stderr)
-                #traceback.print_exc(file=sys.stderr)
 
-    def config_queue_log(self, queue, name):
-        '''
+    @staticmethod
+    def config_queue_log(queue, name):
+        """
         You want to use logging in multiprocessing, call this method in multiprocess and
         call self.listener_start, self.listener_end in main process.
         :param queue:[multiprocessing.Queue] Queue used in QueueHandler as producer.
         :param name:[str] name assigned getLogger.
-        '''
+        """
         qh = logging.handlers.QueueHandler(queue)
         logger = logging.getLogger(name)
         logger.setLevel(logging.DEBUG)
         logger.addHandler(qh)
         return logger
 
-    def config_log(self, file_path, name):
+    @staticmethod
+    def config_log(file_path, name):
         # err file handler
-        fh_err = logging.handlers.TimedRotatingFileHandler(file_path + '_error.log', when='midnight', encoding='utf-8', backupCount=60)
+        fh_err = logging.handlers.TimedRotatingFileHandler(file_path + '_error.log', when='midnight',
+                                                           encoding='utf-8', backupCount=60)
         fh_err.setLevel(logging.WARNING)
         # file handler
-        fh_dbg = logging.handlers.TimedRotatingFileHandler(file_path + '_debug.log', when='midnight', encoding='utf-8', backupCount=60)
+        fh_dbg = logging.handlers.TimedRotatingFileHandler(file_path + '_debug.log', when='midnight',
+                                                           encoding='utf-8', backupCount=60)
         fh_dbg.setLevel(logging.DEBUG)
         # console handler
         sh = logging.StreamHandler()

@@ -2,15 +2,18 @@
 """
 backtester.py
 
-this is backtest module
+this is back test module
 """
 from collections import defaultdict
 import pandas as pd
 import numpy as np
 import datetime
 import copy
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.mysql import DATE, FLOAT, INTEGER, VARCHAR
+
 from kostock import qutils
 from kostock.frechetdist import frdist
 from kostock.plot import Plot
@@ -24,7 +27,7 @@ class ClassOperationError(Exception):
 
 class BackTester:
     def __init__(self, db=None):
-        self._test_list = [] # (,3) dim list. [['code', 'date', 'group'], ...]
+        self._test_list = []  # (,3) dim list. [['code', 'date', 'group'], ...]
         self._code_nums = defaultdict(int)
         self._tax = 0.3
         self._commission = 0.015
@@ -37,10 +40,10 @@ class BackTester:
         self._commission = commission
 
     def insert(self, data):
-        '''
+        """
         insert data into test_list.
         :param data:[(3,)dim] (code[str],date[date or datetime],group[str])
-        '''
+        """
         if len(data) != 3:
             raise ArgumentError('insert argument must be (3,) dimension type')
         no = str(self._code_nums[data[0]])
@@ -62,30 +65,15 @@ class BackTester:
     def get_test_list(self):
         return copy.deepcopy(self._test_list)
 
-    def show_test_list(self, number_of_days=130):
-        cols = ['Date', 'Open', 'Close', 'High', 'Low', 'Volume']
-        data = []
-        for code, date, grp in self._test_list:
-            ohlc = self._db.get_ohlc_prev_from_chart(code[:6], date, number_of_days)
-            df_ohlc = pd.DataFrame(data=ohlc, columns=cols)
-            df_ohlc['Date'] = df_ohlc['Date'].astype('datetime64[ns]')
-            df_ohlc.set_index('Date', inplace=True)
-            data.append({'code': code, 'df': df_ohlc})
-        if data:
-            plt = Plot()
-            plt.plot_ohlc_all(data)
-        else:
-            print("There is no data for show_test_list()")
-
     def back_test(self, number_of_days=130):
-        '''
+        """
         - this method calculate time-varying stock profit ratio by group.
         - it use self._test_list.
         :param number_of_days:[int] backtest check after number_of_days.
         :return testResult:[class testResult] backtest result, it has result DataFrame and Group list.
         DataFrame columns : 'group', 'code', 'date', 'prev_price', 'price', 'captured', after days
         (1) time-varying profit ratio in stock.  (2) statics(mean, geometric mean, std dev, median) in time.
-        '''
+        """
         data_list = []
         group_list = []
 
@@ -110,10 +98,11 @@ class BackTester:
 
             data_list.append(row)
 
+        # add mean, g_mean, stddev, median row
         static = {'mean': np.nanmean, 'g_mean': qutils.nangmean, 'stddev': np.nanstd, 'median': np.nanmedian}
         for group in group_list:
             rest = [None for _ in range(number_of_days + 4)]
-            for stat in static.keys():
+            for stat in static:
                 row = [group, stat]
                 row.extend(rest)
                 data_list.append(row)
@@ -126,11 +115,11 @@ class BackTester:
         days.append('captured')
         for group in group_list:
             for stat, stat_func in static.items():
-                gc = result['grp'] == group
-                sc = result['code'] == stat
+                gc = (result['grp'] == group)
+                sc = (result['code'] == stat)
                 result.loc[gc & sc, days] = stat_func(result.loc[gc, days], axis=0)
 
-        return TestResult(result, group_list)
+        return TestResult(result, self._db)
 
     def ins_chart_pattern(self, code, pattern, threshold=None, window_size=60, window_move=None, group='1',
                           price_opt='c', moving_avg=None, min_diff_ratio=0, max_diff_ratio=float('inf'),
@@ -159,8 +148,8 @@ class BackTester:
         else:
             chart = self._db.get_all_from_chart(code)
 
-        chart = self._choose_chart_price(chart, price_opt, moving_avg)  # DataFrame type
-        fr_pat = self._trans_pat_to_frpat(pattern, window_size)
+        chart = self.__class__._choose_chart_price(chart, price_opt, moving_avg)  # DataFrame type
+        fr_pat = self.__class__._trans_pat_to_frpat(pattern, window_size)
 
         max_pat, min_pat = max(pattern), min(pattern)
         pat_diff = max_pat - min_pat
@@ -176,10 +165,13 @@ class BackTester:
             max_val, min_val = max(part_chart), min(part_chart)
             cht_diff = max_val - min_val
             cht_diff_ratio = cht_diff / min_val * 100  # percent unit
+            if min_val == 0 or cht_diff == 0:
+                days += window_move
+                continue
 
             if min_diff_ratio <= cht_diff_ratio <= max_diff_ratio:
                 fr_cht = (part_chart - min_val) * (pat_diff / cht_diff) + min_pat
-                fr_cht = [[j, data] for j, data in enumerate(fr_cht)] # convert pd.Series to list
+                fr_cht = [[j, data] for j, data in enumerate(fr_cht)]  # convert pd.Series to list
 
                 if frdist(fr_cht, fr_pat) < threshold:
                     date = chart.index[days+window_size-1]
@@ -188,14 +180,15 @@ class BackTester:
                     continue
             days += window_move
 
-    def _choose_chart_price(self, chart, price_opt, avg_window=None):
-        '''
+    @staticmethod
+    def _choose_chart_price(chart, price_opt, avg_window=None):
+        """
         calculate average chart prices(c:close, o:open, h:high, l:low) by option
         :param chart: chart data
         :param price_opt: c:close, o:open, h:high, l:low
         :param avg_window: average by date like moving average.
         :return: [pd.Series] index:date / data:average price
-        '''
+        """
         columns = ['date', 'open', 'close', 'high', 'low',
                    'volume', 'fore', 'inst', 'indi']
         df_chart = pd.DataFrame(data=chart, columns=columns)
@@ -213,7 +206,8 @@ class BackTester:
             ret_chart = ret_chart.rolling(window=avg_window, center=True, min_periods=1).mean()
         return ret_chart
 
-    def _trans_pat_to_frpat(self, pattern, window_size):
+    @staticmethod
+    def _trans_pat_to_frpat(pattern, window_size):
         p = (window_size - 1) // (len(pattern) - 1)
         q = (window_size - 1) % (len(pattern) - 1)
         intervals = [p + 1 if i < q else p for i in range(len(pattern) - 1)]
@@ -228,7 +222,7 @@ class BackTester:
 
     def ins_institution_condition(self, code, th_fore=1, th_inst=1, days=3, group='1',
                                   start_date=None, end_date=None):
-        '''
+        """
         Insert data into this class when institution buying quantity is more than threshold in days.
         :param code: [str] company code(6digit)
         :param th_fore: [int] threshold foreigner quantity
@@ -238,15 +232,18 @@ class BackTester:
         :param start_date: [datetime or date] start date from chart
         :param end_date: [datetime or date] end date from chart
         :return: no returns, insert data into this class attribute.
-        '''
+        """
         if start_date and end_date:
             chart = self._db.get_range_from_chart(code, start_date, end_date)
         else:
             chart = self._db.get_all_from_chart(code)
 
-        if th_fore != 0 and th_inst != 0:  mode = 'BOTH'
-        elif th_fore != 0:  mode = 'FORE'
-        elif th_inst != 0:  mode = 'INST'
+        if th_fore != 0 and th_inst != 0:
+            mode = 'BOTH'
+        elif th_fore != 0:
+            mode = 'FORE'
+        elif th_inst != 0:
+            mode = 'INST'
         else:
             raise ArgumentError('At least one param at th_fore and th_inst should be more than 0')
 
@@ -255,14 +252,15 @@ class BackTester:
             date = c[0]
             fore = c[6]
             inst = c[7]
-            if self._compare_quantity(mode, th_fore, th_inst, fore, inst):
+            if self.__class__._compare_quantity(mode, th_fore, th_inst, fore, inst):
                 day_cnt += 1
             else:
                 day_cnt = 0
             if day_cnt == days:
                 self.insert([code, date, group])
 
-    def _compare_quantity(self, mode, th_fore, th_inst, fore, inst):
+    @staticmethod
+    def _compare_quantity(mode, th_fore, th_inst, fore, inst):
         if mode == 'BOTH':
             if fore and inst:
                 if fore >= th_fore and inst >= th_inst:
@@ -279,18 +277,26 @@ class BackTester:
 
 
 class TestResult:
-    '''
+    """
     This class has result of back test.
     :attribute: self.result[DataFrame] profit ratio and statistics data by code and date.
     :attribute: self.group_list[(?,)] collection user-inserted group data.
     To save or load result,
     you can use method self.set_bt_db() -> self.save() or self.load.
-    '''
-    def __init__(self, result=None, group_list=None):
+    """
+    def __init__(self, result=None, db=None):
         self._result = result
-        self._groups = group_list
-        self._max = None
-        self._min = None
+        self._groups = []
+        self._means = []
+        self._gmeans = []
+        self._stddevs = []
+        self._chart_data = {}
+        self._db = db
+        self._bt_info = None
+
+        self._max = self._get_max_idx_value()  # {group:[row, column, value], ...}
+        self._min = self._get_min_idx_value()  # {group:[row, column, value], ...}
+        self._cal_statics_per_group()
 
     def _get_max_idx_value(self):
         max_group = {}
@@ -318,16 +324,41 @@ class TestResult:
             min_group[group] = [min_col_idx[min_col], min_col, min_sr[min_col]]  # index, column, value
         return min_group
 
+    def _cal_statics_per_group(self):
+        cols = self._result.columns[6:]
+        for group in self._groups:
+            gc = (self._result['grp'] == group)
+            sc_mean = (self._result['code'] == 'mean')
+            sc_gmean = (self._result['code'] == 'g_mean')
+            sc_std = (self._result['code'] == 'stddev')
+            mean = self._result.loc[gc & sc_mean, cols].squeeze()  # change (days, 1) into (days,)
+            gmean = self._result.loc[gc & sc_gmean, cols].squeeze()  # change (days, 1) into (days,)
+            std = self._result.loc[gc & sc_std, cols].squeeze()  # change (days, 1) into (days,)
+            self._groups.append(group)
+            self._means.append(mean)
+            self._gmeans.append(gmean)
+            self._stddevs.append(std)
+
+    def _make_chart_data(self, number_of_days):
+        rc = self._result['code'].isin(['mean', 'g_mean', 'stddev', 'median'])
+        cc = ['code', 'date', 'grp']
+        test_codes = self._result.loc[~rc, cc]
+
+        cols = ['Date', 'Open', 'Close', 'High', 'Low', 'Volume']
+        chart_data = []
+        for code, date, grp in test_codes:
+            ohlc = self._db.get_ohlc_prev_from_chart(code[:6], date, number_of_days)
+            df_ohlc = pd.DataFrame(data=ohlc, columns=cols)
+            df_ohlc['Date'] = df_ohlc['Date'].astype('datetime64[ns]')
+            df_ohlc.set_index('Date', inplace=True)
+            chart_data.append({'code': code, 'df': df_ohlc})
+        return chart_data
+
     def show_summary(self):
-        '''
+        """
         Print mean, geometric mean, standard deviation, median over time
         and max profit, min profit data in result of back test
-        '''
-        if self._max is None:
-            self._max = self._get_max_idx_value()  # {group:[row, column, value], ...}
-        if self._min is None:
-            self._min = self._get_min_idx_value()  # {group:[row, column, value], ...}
-
+        """
         stats = ['mean', 'g_mean', 'stddev', 'median']
         col = self._result.columns[-1]
         for group in self._groups:
@@ -347,34 +378,45 @@ class TestResult:
             print(f"          days : {self._min[group][1]}")
             print(f"          prof : {self._min[group][2]:.3f}\n")
 
-    def show_graph(self):
-        '''
+    def show_profit_graph(self):
+        """
         Show two graph in different window.
         one is mean/geometric mean graph, another is standard deviation graph over time
-        '''
-        cols = self._result.columns[6:]
-        int_cols = pd.to_numeric(cols.str.replace('_', ''))
-        means, gmeans, stds, groups = [], [], [], []
-        for group in self._groups:
-            gc = (self._result['grp'] == group)
-            sc_mean = (self._result['code'] == 'mean')
-            sc_gmean = (self._result['code'] == 'g_mean')
-            sc_std = (self._result['code'] == 'stddev')
-            mean = self._result.loc[gc & sc_mean, cols].squeeze()  # change (1, days) into (days,)
-            gmean = self._result.loc[gc & sc_gmean, cols].squeeze()  # change (1, days) into (days,)
-            std = self._result.loc[gc & sc_std, cols].squeeze()  # change (1, days) into (days,)
-            groups.append(group)
-            means.append(mean)
-            gmeans.append(gmean)
-            stds.append(std)
-
+        """
         plt = Plot()
-        plt.plot_profit(int_cols, groups, means, gmeans)
-        plt.plot_profit_stddev(int_cols, groups, stds)
-        plt.show()
+        plt.plot_profit(self._groups, self._means, self._gmeans, self._stddevs)
+
+    def show_test_code_chart(self, number_of_days=60):
+        if number_of_days not in self._chart_data:
+            self._chart_data[number_of_days] = self._make_chart_data(number_of_days)
+        plt = Plot()
+        plt.plot_ohlc_all(self._chart_data[number_of_days])
+
+    def save_result_to_html(self, title, save_path, number_of_days=60):
+        """
+        Save result(profit, chart data) to HTML file.
+        :param title: title is used for making folder.
+        :param save_path: save path.
+        :param number_of_days: prev days to plot chart data
+        """
+        folder_path = save_path + r"\\result_" + title \
+                      + "_{}".format(datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
+        graph_path = folder_path + r"\\graph"
+        os.makedirs(graph_path)  # make both folder_path folder and graph_path folder
+
+        # save profit, chart graph
+        if number_of_days not in self._chart_data:
+            self._chart_data[number_of_days] = self._make_chart_data(number_of_days)
+        plt = Plot()
+        plt.set_save_path(graph_path)
+        plt.plot_ohlc_all(self._chart_data[number_of_days], save=True)
+        plt.plot_profit(self._groups, self._means, self._gmeans, self._stddevs, save=True)
+
+        with open(folder_path+r"\\result.html") as f:
+            pass
 
     def set_bt_db(self, user_id, norm_pwd, db_name):
-        self._bt_info = {'USER_ID':user_id, 'NORM_PWD':norm_pwd, 'DB_NAME':db_name}
+        self._bt_info = {'USER_ID': user_id, 'NORM_PWD': norm_pwd, 'DB_NAME': db_name}
 
     def get_result_data(self):
         return self._result.copy()
@@ -406,11 +448,3 @@ class TestResult:
 
         self._result = pd.read_sql_table(table_name=table_name, con=engine, index_col='idx')
         self._groups = self._result['grp'].drop_duplicates()
-
-if __name__=='__main__':
-    pat = [6,4,3,2,3,4,6,4,6]
-    a = BackTester()
-    a.ins_institution_condition('005930', 1000, 1000)
-    d = a.get_test_list()
-    for i, j in enumerate(d):
-        print(i, j)
