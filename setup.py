@@ -17,6 +17,7 @@ install_requires = [
       'pywinauto>=0.6.8'
       'numba==0.53.1',
       'scipy==1.5.4'
+      'flask==2.0.1'
       ]
 
 setup(name='ko-stock-assistant',

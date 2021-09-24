@@ -25,9 +25,13 @@ class Plot:
         """
         if save:
             if os.path.exists(self._save_path):
+                save_path_names = []
                 for i in range(len(data)):
-                    save_path_name = self._save_path + r'\\chart_' + str(i) + self._suffix
-                    mpf.plot(data[i]['df'], style='yahoo', type='candle', title=data[i]['code'], savefig=save_path_name)
+                    save_path_name = self._save_path + '\\chart' + f"_{i}" + self._suffix
+                    save_path_names.append(save_path_name)
+                    mpf.plot(data[i]['df'], style='yahoo', type='candle', title=data[i]['code'],
+                             savefig=save_path_name)
+                return save_path_names
             else:
                 raise Exception('Save path {} does not exist.'.format(self._save_path))
 
@@ -110,8 +114,9 @@ class Plot:
 
         if save:
             if os.path.exists(self._save_path):
-                save_path_name = self._save_path + r'\\profit' + self._suffix
+                save_path_name = self._save_path + '\\profit' + self._suffix
                 plt.savefig(save_path_name)
+                return save_path_name
             else:
                 raise Exception('Save path {} does not exist.'.format(self._save_path))
         else:

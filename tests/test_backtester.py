@@ -16,7 +16,7 @@ class BackTesterTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        BackTesterTestCase.DB.close()
+        cls.DB.close()
 
     def setUp(self) -> None:
         self.bt = BackTester(self.__class__.DB)
@@ -30,11 +30,9 @@ class BackTesterTestCase(unittest.TestCase):
     def test_show_test_list(self):
         for i in range(10):
             self.bt.insert(['005930', datetime.date(2000, 12, 30) + timedelta(days=i*10), '1'])
-        self.bt.show_test_list()
 
     def test_ins_chart_pattern(self):
         self.bt.ins_chart_pattern('005930', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        self.bt.show_test_list(number_of_days=60)
 
 if __name__ == '__main__':
     unittest.main()
