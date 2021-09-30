@@ -1,6 +1,7 @@
 import mplfinance as mpf
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
+from matplotlib import gridspec
 import math
 import os
 
@@ -94,23 +95,23 @@ class Plot:
         means, gmeans, stddev : y-axis
         """
         day = [i for i in range(1, len(means[0])+1)]
-        plt.figure('Profit Graph')
-        plt.subplot(2, 2, 1)
-        plt.title('Profit Graph')
-        plt.xlabel('Days')
-        plt.ylabel('Profit')
-        plt.legend()
-        for i, (mean, gmean, group) in enumerate(zip(means, gmeans, groups)):
-            plt.plot(day, mean, color=Plot.color[i], label=f"[G_{group}] mean", linestyle='-')
-            plt.plot(day, gmean, color=Plot.color[i], label=f"[G_{group}] g_mean", linestyle='-.')
+        fig = plt.figure('Profit Graph')
+        spec = gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, 1])
 
-        plt.subplot(2, 1, 1)
-        plt.title('Stddev Graph')
-        plt.xlabel('Days')
-        plt.ylabel('StdDev')
-        plt.legend()
+        ax_profit = fig.add_subplot(spec[0])
+        ax_profit.set_title('Profit Graph')
+        ax_profit.set_ylabel('Profit')
+        for i, (mean, gmean, group) in enumerate(zip(means, gmeans, groups)):
+            ax_profit.plot(day, mean, color=Plot.color[i], label=f"[G_{group}] mean", linestyle='-')
+            ax_profit.plot(day, gmean, color=Plot.color[i], label=f"[G_{group}] g_mean", linestyle='-.')
+        ax_profit.legend()
+
+        ax_stddev = fig.add_subplot(spec[1])
+        ax_stddev.set_xlabel('Days')
+        ax_stddev.set_ylabel('StdDev')
         for i, (stddev, group) in enumerate(zip(stddevs, groups)):
-            plt.plot(day, stddev, color=Plot.color[i], label=f"[G_{group}] stddev")
+            ax_stddev.plot(day, stddev, color=Plot.color[i], label=f"[G_{group}] stddev")
+        ax_stddev.legend()
 
         if save:
             if os.path.exists(self._save_path):

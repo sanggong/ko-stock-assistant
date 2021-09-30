@@ -33,11 +33,14 @@
                 <tbody>
                 {% for row in result.itertuples() %}
                 <tr>
-                    <th scope="row" class=".fixed-side">{{ getattr(row, 'group') }}</th>
-                    <th scope="row" class=".fixed-side">{{ getattr(row, 'code') }}</th>
-                    <th scope="row" class=".fixed-side">{{ getattr(row, 'date') }}</th>
-                    {% for col in result.columns[3:] %}
-                    <td>{{ getattr(row, col) }}</td>
+                    <th scope="row" class=".fixed-side">{{ row|attr('group') }}</th>
+                    <th scope="row" class=".fixed-side">{{ row|attr('code') }}</th>
+                    <th scope="row" class=".fixed-side">{{ row|attr('date') }}</th>
+                    <td>{{ row|attr('prev_price') }}</td>
+                    <td>{{ row|attr('price') }}</td>
+                    <td class=".float">{{ row|attr('captured') }}</td>
+                    {% for col in result.columns[6:] %}
+                    <td class=".float">{{ row|attr(col) }}</td>
                     {% endfor %}
                 </tr>
                 {% endfor %}
@@ -46,7 +49,7 @@
         </div>
 
 <!-- Gallery -->
-        {% for i in range(len(chart_path//4)) %}
+        {% for i in range(chart_path|length // 4) %}
         <div class="row">
             {% for j in range(4) %}
             <div class="col">
@@ -61,5 +64,15 @@
         {% endfor %}
 <!-- Gallery -->
     </div>
+
+    <!-- decimal point convert -->
+    <script type="text/javascript">
+        var elements = document.getElementsByClassName(".float");
+        var float = 0.0
+        for(var i = 0; i < elements.length; i++) {
+            float = parseFloat(elements[i].innerText)
+            elements[i].innerText = float.toFixed(3);
+        }
+    </script>
 </body>
 </html>

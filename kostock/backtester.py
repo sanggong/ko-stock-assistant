@@ -17,7 +17,7 @@ from sqlalchemy.dialects.mysql import DATE, FLOAT, INTEGER, VARCHAR
 from kostock import qutils
 from kostock.frechetdist import frdist
 from kostock.plot import Plot
-from kostock.html_generator import TestResultHTMLGenerator
+from kostock.html_generator import TestResultHtmlGenerator
 
 
 class ArgumentError(Exception):
@@ -288,7 +288,7 @@ class TestResult:
     def __init__(self, result=None, db=None):
         # columns of result = ['group', 'code', 'date', 'prev_price', 'price', 'captured', day1, day2, ...]
         self._result = result
-        self._groups = []
+        self._groups = result['group'].drop_duplicates()
         self._means = []
         self._gmeans = []
         self._stddevs = []
@@ -333,10 +333,11 @@ class TestResult:
             sc_mean = (self._result['code'] == 'mean')
             sc_gmean = (self._result['code'] == 'g_mean')
             sc_std = (self._result['code'] == 'stddev')
+
             mean = self._result.loc[gc & sc_mean, cols].squeeze()  # change (days, 1) into (days,)
             gmean = self._result.loc[gc & sc_gmean, cols].squeeze()  # change (days, 1) into (days,)
             std = self._result.loc[gc & sc_std, cols].squeeze()  # change (days, 1) into (days,)
-            self._groups.append(group)
+
             self._means.append(mean)
             self._gmeans.append(gmean)
             self._stddevs.append(std)
@@ -348,12 +349,17 @@ class TestResult:
 
         cols = ['Date', 'Open', 'Close', 'High', 'Low', 'Volume']
         chart_data = []
-        for code, date, _ in test_codes:
+        for row in test_codes.itertuples():
+            code = getattr(row, 'code')
+            date = getattr(row, 'date')
             ohlc = self._db.get_ohlc_prev_from_chart(code[:6], date, number_of_days)
+
             df_ohlc = pd.DataFrame(data=ohlc, columns=cols)
             df_ohlc['Date'] = df_ohlc['Date'].astype('datetime64[ns]')
             df_ohlc.set_index('Date', inplace=True)
+
             chart_data.append({'code': code, 'df': df_ohlc})
+
         return chart_data
 
     def show_summary(self):
@@ -394,28 +400,29 @@ class TestResult:
         plt = Plot()
         plt.plot_ohlc_all(self._chart_data[number_of_days])
 
-    def save_result_to_html(self, title, save_path, number_of_days=60):
+    def save_result_to_html(self, title, save_path, prev_chart_days=60):
         """
         Save result(profit, chart data) to HTML file.
         :param title: title is used for making folder.
         :param save_path: save path.
         :param number_of_days: prev days to plot chart data
         """
-        folder_path = save_path + r"\\result_" + title \
-                      + "_{}".format(datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
-        graph_path = folder_path + r"\\graph"
+        folder_path = save_path + "\\result_" + title \
+                      + "_{}".format(datetime.datetime.now().strftime('%Y-%m-%d_%Hh-%Mm-%Ss'))
+        graph_path = folder_path + "\\graph"
         os.makedirs(graph_path)  # make both folder_path folder and graph_path folder
 
         # save profit, chart graph
-        if number_of_days not in self._chart_data:
-            self._chart_data[number_of_days] = self._make_chart_data(number_of_days)
+        if prev_chart_days not in self._chart_data:
+            self._chart_data[prev_chart_days] = self._make_chart_data(prev_chart_days)
         plt = Plot()
         plt.set_save_path(graph_path)
-        chart_path = plt.plot_ohlc_all(self._chart_data[number_of_days], save=True)
+        chart_paths = plt.plot_ohlc_all(self._chart_data[prev_chart_days], save=True)
         profit_path = plt.plot_profit(self._groups, self._means, self._gmeans, self._stddevs, save=True)
 
-        html_gen = TestResultHTMLGenerator(folder_path)
-        html_gen.create(title, profit_path, chart_path, self._result)
+        html_gen = TestResultHtmlGenerator(folder_path)
+        path = html_gen.create(title, profit_path, chart_paths, self._result)
+        return path
 
     def set_bt_db(self, user_id, norm_pwd, db_name):
         self._bt_info = {'USER_ID': user_id, 'NORM_PWD': norm_pwd, 'DB_NAME': db_name}
