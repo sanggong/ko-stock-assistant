@@ -46,7 +46,7 @@ class BackTesterTestCase(unittest.TestCase):
         save_path = os.path.dirname(os.path.realpath(__file__))
         path_name = result.save_result_to_html("UNITTEST", save_path)
         self.assertTrue(os.path.exists(path_name))
-        print(result._result)
+
 
 
 if __name__ == '__main__':
