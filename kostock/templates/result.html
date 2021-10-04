@@ -7,6 +7,7 @@
           integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
     <title>{{ title }}</title>
 </head>
+
 <body>
     <div class="container">
         <h2>{{ title }} Test Result</h2>
@@ -44,17 +45,29 @@
         </div>
 
 <!-- Gallery -->
-        {% for i in range(chart_path|length // 4) %}
+        {% for i in range(chart_path|length // 4 + 1) %}
         <div class="row">
-            {% for j in range(4) %}
-            <div class="col">
-                <img
-                src="{{ chart_path[4*i+j] }}"
-                class="w-100 shadow-1-strong rounded mb-4"
-                alt=""
-                />
-            </div>
-            {% endfor %}
+            {% if i != chart_path|length // 4 %}
+                {% for j in range(4) %}
+                <div class="col-3">
+                    <img
+                    src="{{ chart_path[4*i+j] }}"
+                    class="w-100 shadow-1-strong rounded mb-4"
+                    alt=""
+                    />
+                </div>
+                {% endfor %}
+            {% else %}
+                {% for j in range(chart_path|length % 4) %}
+                <div class="col-3">
+                    <img
+                    src="{{ chart_path[4*i+j] }}"
+                    class="w-100 shadow-1-strong rounded mb-4"
+                    alt=""
+                    />
+                </div>
+                {% endfor %}
+            {% endif %}
         </div>
         {% endfor %}
 <!-- Gallery -->
