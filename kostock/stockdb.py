@@ -16,6 +16,12 @@ class StockDB:
         self._db = None
         self.cur = None
 
+    def __enter__(self):
+        self._db.open()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._db.close()
+
     def open(self):
         self._db = mysql.connect(host='localhost', user=self.user_id,
                                  passwd=self.norm_pwd, db=self.db_name,

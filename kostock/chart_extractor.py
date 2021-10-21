@@ -48,12 +48,11 @@ class ChartExtractor:
         if window_move is None:
             window_move = window_size // 10
 
-        self._db.open()
-        if start_date and end_date:
-            chart = self._db.get_range_from_chart(code, start_date, end_date)
-        else:
-            chart = self._db.get_all_from_chart(code)
-        self._db.close()
+        with self._db:
+            if start_date and end_date:
+                chart = self._db.get_range_from_chart(code, start_date, end_date)
+            else:
+                chart = self._db.get_all_from_chart(code)
 
         chart = self.__class__._choose_chart_price(chart, price_opt, moving_avg)  # DataFrame type
         fr_pat = self.__class__._trans_pat_to_frpat(pattern, window_size)
@@ -143,12 +142,11 @@ class ChartExtractor:
         :param end_date: [datetime or date] end date from chart
         :return: no returns, insert data into this class attribute.
         """
-        self._db.open()
-        if start_date and end_date:
-            chart = self._db.get_range_from_chart(code, start_date, end_date)
-        else:
-            chart = self._db.get_all_from_chart(code)
-        self._db.close()
+        with self._db:
+            if start_date and end_date:
+                chart = self._db.get_range_from_chart(code, start_date, end_date)
+            else:
+                chart = self._db.get_all_from_chart(code)
 
         if th_fore != 0 and th_inst != 0:
             mode = 'BOTH'

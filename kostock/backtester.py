@@ -76,23 +76,23 @@ class BackTester:
         days = ['_' + str(i) for i in range(1, number_of_days+1)]
         column_list.extend(days)
 
-        self._db.open()
-        # input list iteration
-        for i in range(len(self._test_list)):
-            code = self._test_list[i][0]
-            date = self._test_list[i][1]
-            group = self._test_list[i][2]
-            if group not in group_list:
-                group_list.append(group)
-            row = [group, code, date]
-            price = self._db.get_future_price_list(code[:6], date, number_of_days)
-            if np.isnan(price[1]):
-                continue
-            row.extend(price)
-            row.insert(5, 0)  # 'captured' column
 
-            data_list.append(row)
-        self._db.close()
+        # input list iteration
+        with self._db:
+            for i in range(len(self._test_list)):
+                code = self._test_list[i][0]
+                date = self._test_list[i][1]
+                group = self._test_list[i][2]
+                if group not in group_list:
+                    group_list.append(group)
+                row = [group, code, date]
+                price = self._db.get_future_price_list(code[:6], date, number_of_days)
+                if np.isnan(price[1]):
+                    continue
+                row.extend(price)
+                row.insert(5, 0)  # 'captured' column
+
+                data_list.append(row)
 
         # add mean, g_mean, stddev, median row
         static = {'mean': np.nanmean, 'g_mean': qutils.nangmean, 'stddev': np.nanstd, 'median': np.nanmedian}

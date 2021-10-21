@@ -31,29 +31,29 @@ class Update:
         db = StockDB(user_id=configUpdate.DB['USER_ID'],
                      norm_pwd=configUpdate.DB['NORM_PWD'],
                      db_name=configUpdate.DB['DB_NAME'])
-        db.open()
+        with db:
         # Init Update
-        is_init = self.check_init(db=db)
-        if is_init:
-            logger.info('Init update start...')
-            self.update_init(db=db)
-        else:
-            logger.info("Init update already done...")
+            is_init = self.check_init(db=db)
+            if is_init:
+                logger.info('Init update start...')
+                self.update_init(db=db)
+            else:
+                logger.info("Init update already done...")
 
-        # Stock Info table Update
-        sinfo_date, chart_date = self.get_update_date()
-        if self.check_sinfo_update(db=db, update_date=sinfo_date):
-            logger.info('Stock info update start...')
-            self.update_sinfo_and_schema(db=db, update_date=sinfo_date)
-            if self.check_manual_transfer():
-                logger.info('To transfer chart data manually, update end...')
-                return
-        else:
-            logger.info('Stock info update is not necessary > skipped')
+            # Stock Info table Update
+            sinfo_date, chart_date = self.get_update_date()
+            if self.check_sinfo_update(db=db, update_date=sinfo_date):
+                logger.info('Stock info update start...')
+                self.update_sinfo_and_schema(db=db, update_date=sinfo_date)
+                if self.check_manual_transfer():
+                    logger.info('To transfer chart data manually, update end...')
+                    return
+            else:
+                logger.info('Stock info update is not necessary > skipped')
 
-        # Chart table Update
-        update_dict = self.get_chart_update_dict(db=db, update_date=chart_date)
-        db.close()
+            # Chart table Update
+            update_dict = self.get_chart_update_dict(db=db, update_date=chart_date)
+
         if update_dict:
             logger.info('Chart update start...')
             self.update_chart_tables(db=db, update_dict=update_dict, update_date=chart_date)
