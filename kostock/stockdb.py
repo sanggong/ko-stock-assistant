@@ -7,12 +7,15 @@ this module handle MariaDB stock database
 
 import MySQLdb as mysql
 
+from kostock._pattern import Singleton
+from kostock.configurer import Configurer
 
-class StockDB:
-    def __init__(self, user_id, norm_pwd, db_name):
-        self.user_id = user_id
-        self.norm_pwd = norm_pwd
-        self.db_name = db_name
+
+class StockDB(metaclass=Singleton):
+    def __init__(self):
+        self.user_id = Configurer.DB["USER_ID"]
+        self.norm_pwd = Configurer.DB["NORM_PWD"]
+        self.db_name = Configurer.DB["STOCK_DB"]
         self._db = None
         self.cur = None
 

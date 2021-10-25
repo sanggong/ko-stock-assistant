@@ -9,11 +9,12 @@ from tqdm import tqdm
 
 from kostock.qutils import measure_time
 from kostock.frechetdist import frdist
+from kostock.stockdb import StockDB
 
 
 class ChartExtractor:
-    def __init__(self, db):
-        self._db = db
+    def __init__(self):
+        self._db = StockDB
 
     """
     def capture_chart_pattern_mp(self, codes, pattern, process_count=1, **kwargs):

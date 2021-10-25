@@ -5,11 +5,6 @@ update.py
 Create and update stock database
 
 """
-from kostock.stockdb import StockDB
-from config import configUpdate
-from kostock import qutils
-from kostock import kiwoom
-from kostock import logs
 import datetime
 import requests
 import sys
@@ -22,15 +17,20 @@ from multiprocessing import Process, Lock, Queue
 import pickle
 import time
 
+from kostock.stockdb import StockDB
+from kostock import qutils
+from kostock import kiwoom
+from kostock import logs
+from kostock import data
+from kostock.configurer import Configurer
+
 
 class Update:
     def run(self):
         # freeze_support()
         log = logs.Log()
-        logger = log.config_log(configUpdate.LOG_PATH, name='file')
-        db = StockDB(user_id=configUpdate.DB['USER_ID'],
-                     norm_pwd=configUpdate.DB['NORM_PWD'],
-                     db_name=configUpdate.DB['DB_NAME'])
+        logger = log.config_log(Configurer.UPDATE_LOG_PATH, name='file')
+        db = StockDB()
         with db:
         # Init Update
             is_init = self.check_init(db=db)
@@ -76,17 +76,19 @@ class Update:
         db.create_sinfo_schema()
 
     def get_update_date(self):
-        update_date = configUpdate.UPDATE_DATE
+        update_date = Configurer.UPDATE_END_DATE
         if update_date is None:
             update_date = datetime.date.today()
         else:
             update_date = datetime.datetime.strptime(update_date, '%Y-%m-%d').date()
 
         chart_update_date = qutils.get_latest_trading_date(update_date,
-                                                           configUpdate.CLOSED_DAYS_EXCEL_PATH)
+                                                           data.HOLIDAY_URL,
+                                                           Configurer.UPDATE_HOLIDAY_KEY)
         sinfo_update_date = chart_update_date - datetime.timedelta(days=1)
         sinfo_update_date = qutils.get_latest_trading_date(sinfo_update_date,
-                                                           configUpdate.CLOSED_DAYS_EXCEL_PATH)
+                                                           data.HOLIDAY_URL,
+                                                           Configurer.UPDATE_HOLIDAY_KEY)
         # sinfo update date is based on WICS index and its website process update at almost 3AM.
         # So previous day will be chosen to be sinfo update date.
         return [sinfo_update_date, chart_update_date]
@@ -110,9 +112,9 @@ class Update:
         only_new_list = []
         with tqdm(total=100, ascii=True, desc='Sinfo Table UPDATE') as pbar:
             # [pbar 80%] update stock info table
-            one_wics = 80 / len(configUpdate.WICS_MC.keys()) # 80%
-            for wics_code in configUpdate.WICS_MC.keys():
-                response = requests.get(qutils.get_wics_url(update_date, wics_code))
+            one_wics = 80 / len(data.WICS_MC.keys()) # 80%
+            for wics_code in data.WICS_MC.keys():
+                response = requests.get(qutils.get_url(data.WICS_URL, update_date, wics_code))
                 if response.status_code == 200:  #
                     json_list = response.json()  # dictionary
                     # response.text -> return str type
@@ -157,7 +159,7 @@ class Update:
 
     def crowling_market_and_numstocks(self, code):
         logger = logs.Log().get_logger('file')
-        html = requests.get(qutils.get_comp_main_url(code))
+        html = requests.get(qutils.get_url(data.COMPANY_MAIN_URL, code))
         if html.status_code == 200:
             bs = BeautifulSoup(html.text, 'html.parser')
             market = bs.select_one('.stxt1').text
@@ -183,7 +185,7 @@ class Update:
 
     def crowling_listing_date(self, code):
         logger = logs.Log().get_logger('file')
-        html = requests.get(qutils.get_comp_corp_url(code))
+        html = requests.get(qutils.get_url(data.COMPANY_CORP_URL, code))
         if html.status_code == 200:
             bs = BeautifulSoup(html.text, 'html.parser')
             listing_date = bs.select_one('.us_table_ty1.table-hb.thbg_g.h_fix.zigbg_no ' + \
@@ -199,9 +201,9 @@ class Update:
         return listing_date
 
     def check_manual_transfer(self):
-        if configUpdate.MANUAL_CHART_TRANSFER is True:
+        if Configurer.UPDATE_MANUAL_CHART_TRANSFER is True:
             return True
-        elif configUpdate.MANUAL_CHART_TRANSFER is False:
+        elif Configurer.UPDATE_MANUAL_CHART_TRANSFER is False:
             return False
         else:
             raise ReferenceError("MANUAL_CHART_TRANSFER in config file must be True or False.")
@@ -209,7 +211,7 @@ class Update:
     def get_chart_update_dict(self, db, update_date):
         update_list = db.get_chart_from_meta()
         update_dict = {}
-        start_date = datetime.datetime.strptime(configUpdate.START_DATE, "%Y-%m-%d").date()
+        start_date = datetime.datetime.strptime(Configurer.UPDATE_START_DATE, "%Y-%m-%d").date()
         for update_row in update_list:
             code = update_row[0][2:]
             last_update = update_row[1]
@@ -231,7 +233,7 @@ class Update:
         log = logs.Log()
         log_queue = Queue()
         logger = log.config_queue_log(log_queue, name='queue')
-        log.listener_start(configUpdate.LOG_PATH, name='file', queue=log_queue)
+        log.listener_start(Configurer.UPDATE_LOG_PATH, name='file', queue=log_queue)
 
         lock = Lock()
         buffer = Queue()
@@ -262,7 +264,7 @@ class Update:
 
         opts = ['10081', '10060']
         for opt in opts:
-            file_path = configUpdate.PROCESS_PICKLE_PATH + f'_{opt}.pickle'
+            file_path = Configurer.UPDATE_PICKLE_PATH + f'_{opt}.pickle'
             if isfile(file_path):
                 remove(file_path)
 
@@ -299,7 +301,7 @@ class Update:
         kwm = kiwoom.Kiwoom()
         self.multiproc_kiwoom_login(kwm, lock, logger)
 
-        file_path = configUpdate.PROCESS_PICKLE_PATH + '_10081.pickle'
+        file_path = Configurer.UPDATE_PICKLE_PATH + '_10081.pickle'
         update_list = self.load_update_list(file_path, logger, update_dict, update_date)
 
         opt = 10081
@@ -322,7 +324,7 @@ class Update:
                     after_price = data.iloc[-1]['close']
                     if before_price != after_price:  # if price is not equal at the same day
                         end = update_dict[code]['last']
-                        start = datetime.datetime.strptime(configUpdate.START_DATE, "%Y-%m-%d").date()
+                        start = datetime.datetime.strptime(Configurer.UPDATE_START_DATE, "%Y-%m-%d").date()
                         try:
                             state, data = kwm.req_opt10081(com_code=code, end_date=end,
                                                               modi_price=True, start_date=start)
@@ -356,7 +358,7 @@ class Update:
         kwm = kiwoom.Kiwoom()
         self.multiproc_kiwoom_login(kwm, lock, logger)
 
-        file_path = configUpdate.PROCESS_PICKLE_PATH + '_10060.pickle'
+        file_path = Configurer.UPDATE_PICKLE_PATH + '_10060.pickle'
         update_list = self.load_update_list(file_path, logger, update_dict, update_date)
 
         opt = 10060
@@ -389,9 +391,9 @@ class Update:
 
     def multiproc_kiwoom_login(self, kiwoom, lock, logger):
         lock.acquire()  # process lock
-        kiwoom.manual_login(user_id=configUpdate.KIWOOM[1]['USER_ID'],
-                            norm_pwd=configUpdate.KIWOOM[1]['NORM_PWD'],
-                            cert_pwd=configUpdate.KIWOOM[1]['CERT_PWD'],
+        kiwoom.manual_login(user_id=Configurer.KIWOOM[0]['USER_ID'],
+                            norm_pwd=Configurer.KIWOOM[0]['NORM_PWD'],
+                            cert_pwd=Configurer.KIWOOM[0]['CERT_PWD'],
                             is_mock=False)
         if kiwoom.get_connect_state():
             logger.debug('Kiwoom login success.')

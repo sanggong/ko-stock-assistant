@@ -17,15 +17,16 @@ from sqlalchemy.dialects.mysql import DATE, FLOAT, INTEGER, VARCHAR
 from kostock import qutils
 from kostock.plot import Plot
 from kostock.html_generator import TestResultHtmlGenerator
+from kostock.stockdb import StockDB
 
 
 class BackTester:
-    def __init__(self, db=None):
+    def __init__(self):
         self._test_list = []  # (,3) dim list. [['code', 'date', 'group'], ...]
         self._code_nums = defaultdict(int)
         self._tax = 0.3
         self._commission = 0.015
-        self._db = db
+        self._db = StockDB()
 
     def set_tax(self, tax):
         self._tax = tax

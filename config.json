@@ -1,0 +1,32 @@
+{
+  "DB": {
+    "USER_ID": "your_id",
+    "NORM_PWD": "your_pwd",
+    "STOCK_DB": "your_db",
+    "BT_DB": "your_db"
+  },
+
+  "KIWOOM": [
+    {"USER_ID": "your_id",
+    "NORM_PWD": "your_pwd",
+    "CERT_PWD": "your_certification_pwd"
+    },
+    {"USER_ID": "your_id",
+    "NORM_PWD": "your_pwd",
+    "CERT_PWD": "your_certification_pwd"
+    }
+  ],
+
+  "UPDATE_HOLIDAY_KEY": "government_key_to_get_holiday_data",
+
+  "UPDATE_START_DATE": "start_date_for_update",
+  "UPDATE_END_DATE": "end_date_for_update",
+
+  "UPDATE_LOG_PATH": "log_path_to_save",
+  "UPDATE_PICKLE_PATH": "pickle_file_path_to_save",
+
+  "UPDATE_BLACK_LIST": ["stock_code1", "stock_code2"],
+
+  "UPDATE_MANUAL_CHART_TRANSFER": true,
+  "UPDATE_NUMBER_OF_PROCESS": 2
+}
