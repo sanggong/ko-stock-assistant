@@ -4,11 +4,12 @@ Created on Tue Apr 28 06:13:12 2020
 
 @author: ksme0
 """
+import datetime
+import re
 
 import requests
 from bs4 import BeautifulSoup
-import datetime
-import re
+
 
 dates = []
 codes = []
@@ -19,7 +20,7 @@ pat_2 = re.compile('[\]\)>]+[ ]*[가-힣a-zA-Z&]+[ ]{1}')
 pat_3 = re.compile("' [가-힣a-zA-Z&]+ ")
 pat_sub = re.compile("[^가-힣a-zA-Z& ]")
 
-for page_num in range(1,42,1):
+for page_num in range(1, 42):
     url = 'https://finance.naver.com/news/news_search.nhn?'\
           'rcdate=1&q=%C6%AF%C2%A1%C1%D6+%BE%EE%B4%D7+%BC%AD%C7%C1%B6%F3%C0%CC%C1%EE&'\
           'x=9&y=15&sm=title.basic&pd=4&stDateStart=1997-01-01&stDateEnd=2019-12-31&'\
@@ -52,8 +53,7 @@ for page_num in range(1,42,1):
             continue
         
         codes.append(code)
-            
-    
+
     for html_date in html_dates:
         date = datetime.datetime.strptime(html_date.text.strip()[:10], '%Y-%m-%d')
         dates.append(date)
@@ -63,4 +63,4 @@ print('crowling done.')
 with open('earning.txt', 'w') as file:
     for idx in range(len(codes)):
         file.write('{0} / {1}\n'.format(codes[idx], dates[idx]))
- 
+

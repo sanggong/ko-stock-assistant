@@ -4,18 +4,16 @@ Created on Thu Apr 30 15:02:01 2020
 
 @author: ksme0
 """
+import datetime
 
 from kostock import backtester
-from config import configBacktest
 from kostock.stockdb import StockDB
-import datetime
+from kostock.configurer import Configurer
 
 list_data = []
 temp_codes = []
 date = None
 bt = backtester.BackTester()
-db = StockDB(configBacktest.DB['USER_ID'], configBacktest.DB['NORM_PWD'], configBacktest.DB['STOCK_DB'])
-db.open()
 
 with open('logs/q1_suprise_com.txt', 'r') as file:
     for line in file:
@@ -38,11 +36,6 @@ with open('logs/q1_suprise_com.txt', 'r') as file:
         
         bt.insert([code, date, '1'])
 
-db.close()
-bt.set_stock_db(configBacktest.DB['USER_ID'], configBacktest.DB['NORM_PWD'], configBacktest.DB['STOCK_DB'])
-#print(bt.get_test_list())
 result = bt.back_test()
 result.show_summary()
-result.set_bt_db(configBacktest.DB['USER_ID'], configBacktest.DB['NORM_PWD'], configBacktest.DB['BT_DB'])
-result.save('test', 'test save', configBacktest.LOG_PATH)
 result.show_graph()

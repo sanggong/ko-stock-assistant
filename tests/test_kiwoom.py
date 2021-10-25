@@ -1,17 +1,17 @@
 import unittest
 import sys
 
-from config import config
-
 from kostock import kiwoom
+from kostock.configurer import Configurer
 
 
 class KiwoomTestCase(unittest.TestCase):
+    Configurer("config.json")
     APP = kiwoom.QApplication(sys.argv)
     KIWOOM = kiwoom.Kiwoom()
-    KIWOOM.manual_login(user_id=config.KIWOOM['USER_ID'],
-                     norm_pwd=config.KIWOOM['NORM_PWD'],
-                     cert_pwd=config.KIWOOM['CERT_PWD'],
+    KIWOOM.manual_login(user_id=Configurer.KIWOOM['USER_ID'],
+                     norm_pwd=Configurer.KIWOOM['NORM_PWD'],
+                     cert_pwd=Configurer.KIWOOM['CERT_PWD'],
                      is_mock=True)
 
     def setUp(self) -> None:

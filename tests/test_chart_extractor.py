@@ -1,19 +1,16 @@
 import unittest
 import time
 
+from kostock.configurer import Configurer
 from kostock.chart_extractor import ChartExtractor
-from kostock.stockdb import StockDB
-from config import config
 
 
 class MyTestCase(unittest.TestCase):
+    Configurer("config.json")
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.DB = StockDB(user_id=config.DB['USER_ID'],
-                         norm_pwd=config.DB['NORM_PWD'],
-                         db_name=config.DB['DB_NAME'])
-        cls.ce = ChartExtractor(cls.DB)
+        cls.ce = ChartExtractor()
 
     """
     def test_capture_chart_pattern_mp(self):

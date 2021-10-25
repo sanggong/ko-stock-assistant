@@ -1,5 +1,5 @@
 # ignore configuration file
-config.py
+config.json
 
 # ignore unversioned file
 .idea/.gitignore

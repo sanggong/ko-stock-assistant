@@ -3,20 +3,17 @@ import datetime
 import os
 from datetime import timedelta
 
-from config import config
-
+from kostock.configurer import Configurer
 from kostock.backtester import BackTester
 from kostock.stockdb import StockDB
 
 
 class BackTesterTestCase(unittest.TestCase):
-
-    DB = StockDB(user_id=config.DB['USER_ID'],
-                 norm_pwd=config.DB['NORM_PWD'],
-                 db_name=config.DB['DB_NAME'])
+    Configurer("config.json")
+    DB = StockDB()
 
     def setUp(self) -> None:
-        self.bt = BackTester(self.__class__.DB)
+        self.bt = BackTester()
 
     # Test start #
     @unittest.skip

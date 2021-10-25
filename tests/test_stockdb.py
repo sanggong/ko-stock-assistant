@@ -2,15 +2,12 @@ import unittest
 import datetime
 
 from kostock.stockdb import StockDB
-
-from config import config
+from kostock.configurer import Configurer
 
 
 class StockDBTestCase(unittest.TestCase):
-
-    DB = StockDB(user_id=config.DB['USER_ID'],
-                 norm_pwd=config.DB['NORM_PWD'],
-                 db_name=config.DB['DB_NAME'])
+    Configurer("config.json")
+    DB = StockDB()
     DB.open()
 
     @classmethod
@@ -33,6 +30,7 @@ class StockDBTestCase(unittest.TestCase):
                   (datetime.date(2000, 1, 5), 5800, 5580, 6060, 5520, 74680200),
                   )
         self.assertEqual(data, answer)
+
 
 if __name__ == '__main__':
     unittest.main()
