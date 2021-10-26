@@ -7,27 +7,27 @@ import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
 
-from kostock.qutils import measure_time
 from kostock.frechetdist import frdist
-from kostock.stockdb import StockDB
 
 
 class ChartExtractor:
-    def __init__(self):
-        self._db = StockDB
 
-    """
-    def capture_chart_pattern_mp(self, codes, pattern, process_count=1, **kwargs):
-
+    @classmethod
+    def capture_chart_pattern_mp(cls, db, codes, pattern, process_count=1, **kwargs):
         captured = []
-        #arguments = [{'code': code, 'pattern': pattern} for code in codes]
-        arguments = [(code, pattern) for code in codes]
-        print(arguments)
-        with Pool(process_count) as p:
-            p.starmap(self.capture_chart_pattern, arguments)
-    """
+        arguments = [{'code': code, 'pattern': pattern, 'db': db, **kwargs} for code in codes]
 
-    def capture_chart_pattern(self, code, pattern, threshold=None, window_size=60, window_move=None, group='1',
+        with Pool(process_count) as p:
+            partial = p.map(cls._proxy_chart_pattern, arguments)
+            captured.extend(partial)
+        return captured
+
+    @classmethod
+    def _proxy_chart_pattern(cls, kwargs):
+        return cls.capture_chart_pattern(**kwargs)
+
+    @classmethod
+    def capture_chart_pattern(cls, code, pattern, db, threshold=None, window_size=60, window_move=None, group='1',
                               price_opt='c', moving_avg=None, min_diff_ratio=0, max_diff_ratio=float('inf'),
                               start_date=None, end_date=None):
         """
@@ -49,14 +49,14 @@ class ChartExtractor:
         if window_move is None:
             window_move = window_size // 10
 
-        with self._db:
+        with db:
             if start_date and end_date:
-                chart = self._db.get_range_from_chart(code, start_date, end_date)
+                chart = db.get_range_from_chart(code, start_date, end_date)
             else:
-                chart = self._db.get_all_from_chart(code)
+                chart = db.get_all_from_chart(code)
 
-        chart = self.__class__._choose_chart_price(chart, price_opt, moving_avg)  # DataFrame type
-        fr_pat = self.__class__._trans_pat_to_frpat(pattern, window_size)
+        chart = cls._choose_chart_price(chart, price_opt, moving_avg)  # DataFrame type
+        fr_pat = cls._trans_pat_to_frpat(pattern, window_size)
 
         max_pat, min_pat = max(pattern), min(pattern)
         pat_diff = max_pat - min_pat
@@ -130,7 +130,8 @@ class ChartExtractor:
                 fr_pat.append([cnt, pat_val])
         return fr_pat
 
-    def capture_inst_cond(self, code, th_fore, th_inst, days=3, group='1',
+    @classmethod
+    def capture_inst_cond(cls, db, code, th_fore, th_inst, days=3, group='1',
                           start_date=None, end_date=None):
         """
         Insert data into this class when institution buying quantity is more than threshold in days.
@@ -143,11 +144,11 @@ class ChartExtractor:
         :param end_date: [datetime or date] end date from chart
         :return: no returns, insert data into this class attribute.
         """
-        with self._db:
+        with db:
             if start_date and end_date:
-                chart = self._db.get_range_from_chart(code, start_date, end_date)
+                chart = db.get_range_from_chart(code, start_date, end_date)
             else:
-                chart = self._db.get_all_from_chart(code)
+                chart = db.get_all_from_chart(code)
 
         if th_fore != 0 and th_inst != 0:
             mode = 'BOTH'
@@ -162,7 +163,7 @@ class ChartExtractor:
         day_cnt = 0
         for c in chart:
             date, fore, inst = c[0], c[6], c[7]
-            if self.__class__._compare_quantity(mode, th_fore, th_inst, fore, inst):
+            if cls.__class__._compare_quantity(mode, th_fore, th_inst, fore, inst):
                 day_cnt += 1
             else:
                 day_cnt = 0

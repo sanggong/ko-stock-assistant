@@ -20,10 +20,10 @@ class StockDB(metaclass=Singleton):
         self.cur = None
 
     def __enter__(self):
-        self._db.open()
+        self.open()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._db.close()
+        self.close()
 
     def open(self):
         self._db = mysql.connect(host='localhost', user=self.user_id,

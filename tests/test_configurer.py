@@ -3,7 +3,7 @@ import unittest
 from kostock.configurer import Configurer
 
 
-class MyTestCase(unittest.TestCase):
+class ConfigurerTestCase(unittest.TestCase):
 
     Configurer("config.json")
 
